@@ -1,0 +1,95 @@
+{
+ "generated": "2026-10-12T16:36",
+ "note": "Written by GeoNote_offline_data.ipynb. Lists the files on the website.",
+ "geol": {
+  "isan": {
+   "file": "data/geol/isan.geojson",
+   "bytes": 3640226,
+   "units": 694
+  },
+  "north": {
+   "file": "data/geol/north.geojson",
+   "bytes": 6157177,
+   "units": 2737
+  },
+  "west": {
+   "file": "data/geol/west.geojson",
+   "bytes": 1381900,
+   "units": 455
+  },
+  "central": {
+   "file": "data/geol/central.geojson",
+   "bytes": 1117346,
+   "units": 484
+  },
+  "east": {
+   "file": "data/geol/east.geojson",
+   "bytes": 1259779,
+   "units": 570
+  },
+  "south": {
+   "file": "data/geol/south.geojson",
+   "bytes": 3905660,
+   "units": 2153
+  }
+ },
+ "map": {
+  "isan": {
+   "bytes": 67522814,
+   "maxzoom": 13,
+   "parts": [
+    "data/map/isan.pmtiles.001",
+    "data/map/isan.pmtiles.002",
+    "data/map/isan.pmtiles.003",
+    "data/map/isan.pmtiles.004"
+   ]
+  },
+  "north": {
+   "bytes": 88635536,
+   "maxzoom": 14,
+   "parts": [
+    "data/map/north.pmtiles.001",
+    "data/map/north.pmtiles.002",
+    "data/map/north.pmtiles.003",
+    "data/map/north.pmtiles.004",
+    "data/map/north.pmtiles.005"
+   ]
+  },
+  "west": {
+   "bytes": 28461546,
+   "maxzoom": 14,
+   "parts": [
+    "data/map/west.pmtiles.001",
+    "data/map/west.pmtiles.002"
+   ]
+  },
+  "central": {
+   "bytes": 60637318,
+   "maxzoom": 14,
+   "parts": [
+    "data/map/central.pmtiles.001",
+    "data/map/central.pmtiles.002",
+    "data/map/central.pmtiles.003",
+    "data/map/central.pmtiles.004"
+   ]
+  },
+  "east": {
+   "bytes": 28166476,
+   "maxzoom": 14,
+   "parts": [
+    "data/map/east.pmtiles.001",
+    "data/map/east.pmtiles.002"
+   ]
+  },
+  "south": {
+   "bytes": 61362010,
+   "maxzoom": 14,
+   "parts": [
+    "data/map/south.pmtiles.001",
+    "data/map/south.pmtiles.002",
+    "data/map/south.pmtiles.003",
+    "data/map/south.pmtiles.004"
+   ]
+  }
+ }
+}

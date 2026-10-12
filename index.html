@@ -1,0 +1,87 @@
+<!doctype html>
+<html lang="th" data-theme="geonote" data-mode="light">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#f8f7f3">
+<meta name="color-scheme" content="light dark">
+<meta name="description" content="GeoNote — Geological field GPS and digital field notebook for Geotechnology KKU">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="apple-mobile-web-app-title" content="GeoNote">
+<title>GeoNote</title>
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="icons/favicon.ico" sizes="any">
+<link rel="icon" type="image/png" sizes="32x32" href="icons/favicon-32.png">
+<link rel="icon" type="image/png" sizes="192x192" href="icons/icon-192.png">
+<link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+<link rel="stylesheet" href="vendor/leaflet/leaflet.css">
+<link rel="stylesheet" href="css/fonts.css">
+<link rel="stylesheet" href="css/app.css">
+<script>
+  // colour the loading screen with the chosen theme before the app starts; show it once per launch
+  (function () {
+    var r = document.documentElement, t = null, seen = false;
+    try { t = JSON.parse(localStorage.getItem('geonote.theme') || 'null'); } catch (e) {}
+    if (t && t.id) {
+      r.setAttribute('data-theme', t.id);
+      r.setAttribute('data-mode', t.mode === 'dark' ? 'dark' : 'light');
+      var m = document.querySelector('meta[name="theme-color"]');
+      if (m && t.bar) m.content = t.bar;
+    }
+    try { seen = sessionStorage.getItem('geonote.splash') === '1'; } catch (e) {}
+    if (seen) r.classList.add('no-splash');
+  })();
+</script>
+</head>
+<body>
+<div id="splash" aria-hidden="true">
+  <svg class="sp-lines" viewBox="0 0 400 300" preserveAspectRatio="xMidYMax slice" aria-hidden="true">
+    <path d="M-10 250 C 60 215, 120 238, 190 205 S 320 170, 410 196"/>
+    <path d="M-10 268 C 70 238, 130 258, 200 228 S 320 198, 410 220"/>
+    <path d="M-10 286 C 80 260, 140 278, 210 252 S 330 226, 410 244"/>
+    <path d="M-10 304 C 90 282, 150 298, 220 276 S 340 254, 410 268"/>
+  </svg>
+  <div class="sp-center">
+    <img class="sp-icon" src="icons/icon-512.png" alt="" width="132" height="132">
+    <p class="sp-name">GeoNote</p>
+    <p class="sp-tag" data-en="Geological field notebook">สมุดสนามธรณีวิทยา</p>
+  </div>
+  <div class="sp-foot">
+    <div class="sp-bar"><i></i></div>
+    <p data-en="Geotechnology · Khon Kaen University">เทคโนโลยีธรณี · มหาวิทยาลัยขอนแก่น</p>
+  </div>
+</div>
+<script>
+  // loading screen in the chosen language (same rule as js/i18n.js)
+  (function () {
+    var l = null;
+    try { l = localStorage.getItem('geonote.lang'); } catch (e) {}
+    if (l !== 'th' && l !== 'en') l = /^th\b/i.test(navigator.language || 'th') ? 'th' : 'en';
+    document.documentElement.lang = l;
+    if (l === 'en') document.querySelectorAll('#splash [data-en]').forEach(function (el) { el.textContent = el.getAttribute('data-en'); });
+  })();
+</script>
+<div id="app">
+  <header class="topbar">
+    <div class="tb-side" id="tbLeft"></div>
+    <div class="tb-title" id="tbTitle"></div>
+    <div class="tb-side right" id="tbRight"></div>
+  </header>
+  <main id="view" tabindex="-1"></main>
+  <nav class="tabbar" id="tabbar" aria-label="เมนูหลัก">
+    <a class="tab" data-tab="gps" href="#/gps"><span>GPS</span></a>
+    <a class="tab" data-tab="map" href="#/map"><span>Map</span></a>
+    <a class="tab" data-tab="stations" href="#/stations"><span>Stations</span></a>
+    <a class="tab" data-tab="settings" href="#/settings"><span>Settings</span></a>
+  </nav>
+</div>
+<div id="overlay"></div>
+<div id="toast" role="status" aria-live="polite"></div>
+<noscript><p style="padding:24px">GeoNote ต้องเปิด JavaScript จึงจะใช้งานได้ · GeoNote needs JavaScript.</p></noscript>
+<script src="vendor/leaflet/leaflet.js"></script>
+<script src="vendor/offline-map.js"></script>
+<script type="module" src="js/app.js"></script>
+</body>
+</html>
