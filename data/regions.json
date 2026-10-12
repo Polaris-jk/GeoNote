@@ -38,57 +38,74 @@
    "bytes": 67522814,
    "maxzoom": 13,
    "parts": [
-    "data/map/isan.pmtiles.001",
-    "data/map/isan.pmtiles.002",
-    "data/map/isan.pmtiles.003",
-    "data/map/isan.pmtiles.004"
+    "data/map/isan-01.bin",
+    "data/map/isan-02.bin",
+    "data/map/isan-03.bin",
+    "data/map/isan-04.bin",
+    "data/map/isan-05.bin",
+    "data/map/isan-06.bin",
+    "data/map/isan-07.bin",
+    "data/map/isan-08.bin"
    ]
   },
   "north": {
    "bytes": 88635536,
    "maxzoom": 14,
    "parts": [
-    "data/map/north.pmtiles.001",
-    "data/map/north.pmtiles.002",
-    "data/map/north.pmtiles.003",
-    "data/map/north.pmtiles.004",
-    "data/map/north.pmtiles.005"
+    "data/map/north-01.bin",
+    "data/map/north-02.bin",
+    "data/map/north-03.bin",
+    "data/map/north-04.bin",
+    "data/map/north-05.bin",
+    "data/map/north-06.bin",
+    "data/map/north-07.bin",
+    "data/map/north-08.bin",
+    "data/map/north-09.bin",
+    "data/map/north-10.bin"
    ]
   },
   "west": {
    "bytes": 28461546,
    "maxzoom": 14,
    "parts": [
-    "data/map/west.pmtiles.001",
-    "data/map/west.pmtiles.002"
+    "data/map/west-01.bin",
+    "data/map/west-02.bin",
+    "data/map/west-03.bin"
    ]
   },
   "central": {
    "bytes": 60637318,
    "maxzoom": 14,
    "parts": [
-    "data/map/central.pmtiles.001",
-    "data/map/central.pmtiles.002",
-    "data/map/central.pmtiles.003",
-    "data/map/central.pmtiles.004"
+    "data/map/central-01.bin",
+    "data/map/central-02.bin",
+    "data/map/central-03.bin",
+    "data/map/central-04.bin",
+    "data/map/central-05.bin",
+    "data/map/central-06.bin",
+    "data/map/central-07.bin"
    ]
   },
   "east": {
    "bytes": 28166476,
    "maxzoom": 14,
    "parts": [
-    "data/map/east.pmtiles.001",
-    "data/map/east.pmtiles.002"
+    "data/map/east-01.bin",
+    "data/map/east-02.bin",
+    "data/map/east-03.bin"
    ]
   },
   "south": {
    "bytes": 61362010,
    "maxzoom": 14,
    "parts": [
-    "data/map/south.pmtiles.001",
-    "data/map/south.pmtiles.002",
-    "data/map/south.pmtiles.003",
-    "data/map/south.pmtiles.004"
+    "data/map/south-01.bin",
+    "data/map/south-02.bin",
+    "data/map/south-03.bin",
+    "data/map/south-04.bin",
+    "data/map/south-05.bin",
+    "data/map/south-06.bin",
+    "data/map/south-07.bin"
    ]
   }
  }
