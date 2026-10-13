@@ -1,4 +1,5 @@
-// Settings — current project, coordinates, GPS, permissions, display, storage.
+// Settings — project, language, colour theme, GPS, coordinates, offline data, Smart Photo,
+// the strike/dip sensor, permissions, storage.
 
 import * as store from '../store.js';
 import { mainHeader, toast, applyTheme } from '../ui.js';
@@ -6,7 +7,7 @@ import { icon } from '../icons.js';
 import { openCalibration } from './clino.js';
 import * as offline from '../offlinemap.js';
 import * as geol from '../geology.js';
-import { THEMES, DEFAULT_THEME, themeName, themeDesc } from '../themes.js';
+import { THEMES, THEME_GROUPS, DEFAULT_THEME, themeName, themeDesc } from '../themes.js';
 import { downloadRegion } from './offline-dl.js';
 import { REGIONS, regionById, regionName, regionNote, manifest } from '../regions.js';
 import { esc, debounce, fmtSize, parseNum, isStandalone, isIOS } from '../util.js';
@@ -40,6 +41,30 @@ export async function render(root) {
     </section>
 
     <section class="sec">
+      <h2 class="sec-h">ภาษา · Language</h2>
+      <div class="seg lang-seg" role="radiogroup" aria-label="ภาษา Language">${LANGS.map((l) => `<button type="button" role="radio" data-lang="${l.id}" aria-checked="${l.id === getLang()}" class="${l.id === getLang() ? 'on' : ''}">${l.name}</button>`).join('')}</div>
+    </section>
+
+    <section class="sec">
+      <h2 class="sec-h">${t('ธีมสี', 'Colour theme')}</h2>
+      ${THEME_GROUPS.map((g) => `<p class="theme-group">${esc(t(g.name, g.nameEn))}</p>
+      <div class="theme-grid" role="radiogroup" aria-label="${esc(t(g.name, g.nameEn))}">
+        ${THEMES.filter((x) => x.group === g.id).map((x) => `<button type="button" class="theme-card" role="radio" data-theme-id="${x.id}" aria-checked="${x.id === s.theme}">
+          <span class="tp" data-theme="${x.id}" aria-hidden="true"><i class="tp-bar"><i></i></i><i class="tp-l1"></i><i class="tp-l2"></i><i class="tp-btn"></i><i class="tp-tab"><i></i><i class="on"></i><i></i><i></i></i></span>
+          <b>${esc(themeName(x))}${x.id === DEFAULT_THEME ? `<small>${t('ค่าเริ่มต้น', 'default')}</small>` : ''}</b>
+          <span class="theme-desc">${esc(themeDesc(x))}</span>
+        </button>`).join('')}
+      </div>`).join('')}
+      <p class="hint">${t(`ปุ่ม ${icon('sun', 'i inline')} มุมขวาบนสลับเป็นธีมกลางแดดชั่วคราว แตะอีกครั้งเพื่อกลับธีมที่เลือกไว้`, `The ${icon('sun', 'i inline')} button at the top right switches to Sunlight for a while; tap it again to go back.`)}</p>
+    </section>
+
+    <section class="sec">
+      <h2 class="sec-h">GPS</h2>
+      <div class="field"><span class="lbl">${t('ปิด GPS เมื่อได้ความแม่นยำ', 'Turn the GPS off at accuracy')}</span>${seg('gpsTarget', s.gpsTarget, [['5', '±5 m'], ['10', '±10 m'], ['20', '±20 m']])}</div>
+      <p class="hint">${t('GeoNote เปิด GPS เฉพาะตอนแตะ ดูตำแหน่ง หรือสร้าง Station ใหม่ แล้วปิดทันทีเมื่อได้ค่าตามนี้ หรือครบ 30 วินาที (แตะ ใช้ค่านี้ เพื่อหยุดก่อนได้) ตั้งค่าสูงขึ้นจะปิดเร็วขึ้นและประหยัดแบตกว่า', 'GeoNote turns the GPS on only when you tap Locate or create a station, and off again as soon as it reaches this accuracy or after 30 seconds (tap Use this to stop sooner). A larger value stops sooner and saves battery.')}</p>
+    </section>
+
+    <section class="sec">
       <h2 class="sec-h">Coordinates</h2>
       <div class="field"><span class="lbl">${t('แสดงพิกัดเป็น', 'Show coordinates as')}</span>${seg('coordFormat', s.coordFormat, [['utm', 'Grid Ref'], ['dd', 'Lat/Long'], ['dms', 'DMS']])}</div>
       <div class="field"><span class="lbl">UTM zone</span>${seg('utmZone', s.utmZone, [['auto', 'Auto'], ['47', '47'], ['48', '48']])}</div>
@@ -50,9 +75,8 @@ export async function render(root) {
     </section>
 
     <section class="sec">
-      <h2 class="sec-h">GPS</h2>
-      <div class="field"><span class="lbl">${t('ปิด GPS เมื่อได้ความแม่นยำ', 'Turn the GPS off at accuracy')}</span>${seg('gpsTarget', s.gpsTarget, [['5', '±5 m'], ['10', '±10 m'], ['20', '±20 m']])}</div>
-      <p class="hint">${t('GeoNote เปิด GPS เฉพาะตอนแตะ ดูตำแหน่ง หรือสร้าง Station ใหม่ แล้วปิดทันทีเมื่อได้ค่าตามนี้ หรือครบ 30 วินาที (แตะ ใช้ค่านี้ เพื่อหยุดก่อนได้) ตั้งค่าสูงขึ้นจะปิดเร็วขึ้นและประหยัดแบตกว่า', 'GeoNote turns the GPS on only when you tap Locate or create a station, and off again as soon as it reaches this accuracy or after 30 seconds (tap Use this to stop sooner). A larger value stops sooner and saves battery.')}</p>
+      <h2 class="sec-h">${t('ข้อมูลออฟไลน์ตามภาค', 'Offline data by region')}</h2>
+      <div id="offBox"><p class="hint">${t('กำลังตรวจสอบ', 'Checking')}</p></div>
     </section>
 
     <section class="sec">
@@ -76,30 +100,6 @@ export async function render(root) {
       </ol>
       <p class="hint">${t('เข็มทิศบน iPhone ต้องแตะอนุญาตใหม่ทุกครั้งที่เปิดแอป เป็นข้อจำกัดของเว็บแอปบน iOS ที่แก้จากฝั่งแอปไม่ได้', 'On iPhone the compass must be allowed again each time the app opens. This is an iOS limit for web apps.')}</p>`
       : `<p class="hint">${t('บน Android เครื่องจะจำสิทธิ์ตำแหน่งไว้ และเข็มทิศไม่ต้องขอสิทธิ์', 'On Android the location permission is remembered and the compass needs no permission.')}</p>`}
-    </section>
-
-    <section class="sec">
-      <h2 class="sec-h">${t('ข้อมูลออฟไลน์ตามภาค', 'Offline data by region')}</h2>
-      <div id="offBox"><p class="hint">${t('กำลังตรวจสอบ', 'Checking')}</p></div>
-    </section>
-
-    <section class="sec">
-      <h2 class="sec-h">ภาษา · Language</h2>
-      <div class="seg lang-seg" role="radiogroup" aria-label="ภาษา Language">${LANGS.map((l) => `<button type="button" role="radio" data-lang="${l.id}" aria-checked="${l.id === getLang()}" class="${l.id === getLang() ? 'on' : ''}">${l.name}</button>`).join('')}</div>
-    </section>
-
-    <section class="sec">
-      <h2 class="sec-h">${t('ธีมสี', 'Colour theme')}</h2>
-      <div class="theme-grid" role="radiogroup" aria-label="${t('ธีมสีของแอป', 'App colour theme')}">
-        ${THEMES.map((x) => `<button type="button" class="theme-card" role="radio" data-theme-id="${x.id}" aria-checked="${x.id === s.theme}">
-          <span class="theme-prev" style="background:${x.swatch[0]}">
-            <i style="background:${x.swatch[1]}"></i><i style="background:${x.swatch[2]}"></i><i style="background:${x.swatch[3]}"></i>
-          </span>
-          <b>${esc(themeName(x))}${x.id === DEFAULT_THEME ? `<small>${t('ค่าเริ่มต้น', 'default')}</small>` : ''}</b>
-          <span class="theme-desc">${esc(themeDesc(x))}</span>
-        </button>`).join('')}
-      </div>
-      <p class="hint">${t(`ปุ่ม ${icon('sun', 'i inline')} มุมขวาบนสลับเป็นธีมกลางแดดชั่วคราว แตะอีกครั้งเพื่อกลับธีมที่เลือกไว้`, `The ${icon('sun', 'i inline')} button at the top right switches to Sunlight for a while; tap it again to go back.`)}</p>
     </section>
 
     <section class="sec">
@@ -283,7 +283,6 @@ export async function render(root) {
     });
     const value = key === 'gpsTarget' ? Number(b.dataset.v) : key === 'smartAutoSave' ? b.dataset.v === 'on' : b.dataset.v;
     await store.updateSettings({ [key]: value });
-    
   });
 
   return () => { offUnsub(); savers.forEach((d) => d.flush()); };

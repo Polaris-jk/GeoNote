@@ -30,8 +30,14 @@ export async function render(root, ctx) {
     return;
   }
 
-  const saved = store.getSettings().summary || {};
-  const opts = { format: 'post', theme: 'dark', basemap: true, rotate: true, ...saved };
+  const settings = store.getSettings();
+  const saved = settings.summary || {};
+  // v1.2 saved a yes/no "basemap"; with no choice yet, follow the app's map (satellite or street)
+  const background = ['plain', 'osm', 'sat', 'offline'].includes(saved.background) ? saved.background
+    : saved.basemap === false ? 'plain' : saved.basemap === true ? 'osm'
+      : settings.basemap === 'sat' ? 'sat' : 'osm';
+  const opts = { format: saved.format || 'post', theme: saved.theme || 'dark', rotate: saved.rotate !== false, background };
+  const NOTE = t('เวลาของแต่ละจุดคือเวลาที่กด NEW STATION ไม่นับการแก้ไขภายหลัง', 'Each point\'s time is when NEW STATION was tapped, not later edits.');
   const first = Math.min(...located.map((s) => s.createdAt));
   const last = Math.max(...located.map((s) => s.createdAt));
 
@@ -39,10 +45,10 @@ export async function render(root, ctx) {
     <div class="sum-preview" id="sumBox"><p class="loading"><i class="spinner"></i></p></div>
     <p class="sum-facts">${esc(project.name)}: ${located.length} Stations, ${t('เก็บข้อมูล', 'in the field for')} ${located.length > 1 ? duration(last - first) : '—'}</p>
     <div class="field"><span class="lbl">${t('ขนาดรูป', 'Picture size')}</span>${seg('format', opts.format, [['post', t('โพสต์ 4:5', 'Post 4:5')], ['story', t('สตอรี่ 9:16', 'Story 9:16')]])}</div>
-    <div class="field"><span class="lbl">${t('พื้นหลัง', 'Background')}</span>${seg('basemap', opts.basemap, [['true', t('แผนที่', 'Map')], ['false', t('เรียบ', 'Plain')]])}</div>
+    <div class="field"><span class="lbl">${t('พื้นหลัง', 'Background')}</span>${seg('background', opts.background, [['plain', t('เรียบ', 'Plain')], ['osm', t('แผนที่ OSM', 'Street')], ['sat', t('ดาวเทียม', 'Satellite')], ['offline', t('ออฟไลน์', 'Offline')]])}</div>
     <div class="field"><span class="lbl">${t('สี', 'Colours')}</span>${seg('theme', opts.theme, [['dark', t('มืด', 'Dark')], ['light', t('สว่าง', 'Light')]])}</div>
     <div class="field"><span class="lbl">${t('หมุนแผนที่ให้พอดีกรอบ', 'Rotate the map to fit')}</span>${seg('rotate', opts.rotate, [['true', t('หมุนได้', 'Allow')], ['false', t('ทิศเหนือขึ้นเสมอ', 'North always up')]])}</div>
-    <p class="hint" id="sumNote">${t('แผนที่พื้นหลังต้องใช้อินเทอร์เน็ต หรือเคยเปิดแผนที่บริเวณนี้มาก่อน เวลาของแต่ละจุดคือเวลาที่กด NEW STATION ไม่นับการแก้ไขภายหลัง', 'The background map needs internet, or this area viewed before. Each point\'s time is when NEW STATION was tapped, not later edits.')}</p>
+    <p class="hint" id="sumNote">${NOTE}</p>
   </div>
   <div class="cta"><button type="button" class="btn-primary xl" id="btnShare" disabled>${icon('share')}<span>${t('บันทึกหรือแชร์รูป', 'Save or share the picture')}</span></button></div>`;
 
@@ -65,9 +71,18 @@ export async function render(root, ctx) {
       file = new File([out.blob], name, { type: 'image/jpeg' });
       box.innerHTML = `<img src="${url}" alt="${t('แผนที่สรุปโปรเจกต์', 'Summary map of')} ${esc(project.name)}" width="${out.width}" height="${out.height}">`;
       box.dataset.rotation = String(out.rotation);
-      box.dataset.tiles = String(out.tilesDrawn);
+      box.dataset.background = out.background;
+      // say what the picture really shows when it is not what was chosen; reset otherwise
       const note = root.querySelector('#sumNote');
-      if (opts.basemap && !out.tilesDrawn) note.textContent = t('โหลดแผนที่พื้นหลังไม่ได้ (ไม่มีอินเทอร์เน็ต) รูปนี้ใช้พื้นหลังแบบเรียบแทน', 'Could not load the background map (no internet), so this picture uses a plain background.');
+      let why = '';
+      if (opts.background !== 'plain' && out.background === 'plain') {
+        why = opts.background === 'offline'
+          ? t('ยังไม่มีแผนที่ออฟไลน์ของบริเวณนี้ในเครื่อง ดาวน์โหลดได้ที่ Settings → ข้อมูลออฟไลน์ตามภาค รูปนี้ใช้พื้นหลังแบบเรียบ', 'No offline map of this area on the phone yet (Settings → Offline data by region), so this picture has a plain background.')
+          : t('โหลดแผนที่พื้นหลังไม่ได้ (ไม่มีอินเทอร์เน็ต และไม่มีแผนที่ออฟไลน์ของบริเวณนี้) รูปนี้ใช้พื้นหลังแบบเรียบ', 'Could not load the background (no internet and no offline map of this area), so this picture has a plain background.');
+      } else if (out.background === 'offline' && opts.background !== 'offline') {
+        why = t('ไม่มีอินเทอร์เน็ต รูปนี้ใช้แผนที่ออฟไลน์ในเครื่องแทน', 'No internet, so this picture uses the offline map on the phone.');
+      }
+      note.textContent = why ? `${why} ${NOTE}` : NOTE;
       btn.disabled = false;
     } catch (err) {
       if (my === job) box.innerHTML = `<p class="x-error">${t('สร้างรูปไม่สำเร็จ', 'Could not make the picture')}: ${esc(err.message)}</p>`;

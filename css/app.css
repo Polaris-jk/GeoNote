@@ -13,6 +13,21 @@
   --map-ink: #f5c933;
 }
 
+/* Extras a theme may set (defaults here): the header background and the line or band under it,
+   the fill of primary buttons (a colour or a gradient), a pattern behind the screens, and a filter
+   over the map. Declared on every [data-theme] element, so the previews in Settings show them too. */
+:root, [data-theme] {
+  --bar: var(--bg);
+  --bar-edge: 1px solid var(--rule);
+  --bar-band: none;
+  --bar-band-h: 0px;
+  --accent-fill: var(--accent);
+  --paper-img: none;
+  --paper-size: auto;
+  --paper-attach: local;
+  --map-filter: none;
+}
+
 /* GeoNote: paper white, slate navy, sand and river blue (from the app icon) */
 :root, [data-theme='geonote'] {
   --bg: #f8f7f3;
@@ -163,6 +178,209 @@
   color-scheme: light;
 }
 
+/* ---------- special themes (v1.3) ---------- */
+
+/* สมุดสนาม: yellow all-weather field-book paper, 5 mm grid, dark olive cover */
+[data-theme='fieldbook'] {
+  --bg: #f2e8b6;
+  --raise: #ebdf9f;
+  --raise-2: #e2d48a;
+  --rule: #d3c37a;
+  --rule-strong: #7d7040;
+  --text: #1f241b;
+  --text-2: #3e4433;
+  --text-3: #626448;
+  --accent: #33402a;
+  --accent-ink: #f2e8b6;
+  --accent-soft: rgba(51, 64, 42, 0.14);
+  --sym: #a33a1c;
+  --good: #2f6b36;
+  --fair: #855600;
+  --bad: #a3301c;
+  --info: #2c5f86;
+  --chip: rgba(242, 232, 182, 0.94);
+  --focus: #33402a;
+  --tab-on: #33402a;
+  --btn-edge: transparent;
+  --bar-edge: 2px solid #33402a;
+  --paper-img: linear-gradient(rgba(60, 90, 64, 0.15) 1px, transparent 1px), linear-gradient(90deg, rgba(60, 90, 64, 0.15) 1px, transparent 1px);
+  --paper-size: 18px 18px;
+  color-scheme: light;
+}
+
+/* แผนที่ภูมิประเทศ: a topographic sheet, brown contour lines, blue water */
+[data-theme='topo'] {
+  --bg: #f8f4ea;
+  --raise: #f0e9d9;
+  --raise-2: #e7dec9;
+  --rule: #dccfb4;
+  --rule-strong: #8c7558;
+  --text: #2b2118;
+  --text-2: #4f3f30;
+  --text-3: #72624f;
+  --accent: #94512a;
+  --accent-ink: #fffaf0;
+  --accent-soft: rgba(148, 81, 42, 0.14);
+  --sym: #1f6aa5;
+  --good: #3f7a3a;
+  --fair: #9a5f0c;
+  --bad: #b03a2e;
+  --info: #1f6aa5;
+  --chip: rgba(248, 244, 234, 0.94);
+  --focus: #94512a;
+  --tab-on: #94512a;
+  --btn-edge: transparent;
+  --bar-edge: 2px solid #b78456;
+  --paper-img: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='240' height='120' fill='none' stroke='%238c5a2b' stroke-opacity='0.2'%3E%3Cpath d='M0 16Q60 2 120 16T240 16'/%3E%3Cpath d='M0 44Q30 58 60 44T120 44T180 44T240 44'/%3E%3Cpath stroke-width='2' stroke-opacity='0.3' d='M0 74Q60 92 120 74T240 74'/%3E%3Cpath d='M0 104Q20 94 40 104T80 104T120 104T160 104T200 104T240 104'/%3E%3C/svg%3E");
+  --paper-size: 240px 120px;
+  color-scheme: light;
+}
+
+/* พิมพ์เขียว: blueprint sheet with a white drafting grid */
+[data-theme='blueprint'] {
+  --bg: #14365c;
+  --raise: #1a426d;
+  --raise-2: #214e7e;
+  --rule: #2f5f91;
+  --rule-strong: #7096c0;
+  --text: #eef4fb;
+  --text-2: #c7d8ea;
+  --text-3: #93afcc;
+  --accent: #eef4fb;
+  --accent-ink: #14365c;
+  --accent-soft: rgba(238, 244, 251, 0.14);
+  --sym: #ffd166;
+  --good: #7fd1a6;
+  --fair: #ffd166;
+  --bad: #ff8a7a;
+  --info: #9fd3ff;
+  --chip: rgba(20, 54, 92, 0.88);
+  --focus: #ffd166;
+  --tab-on: #ffffff;
+  --btn-edge: transparent;
+  --bar-edge: 1px solid rgba(238, 244, 251, 0.4);
+  --paper-img: linear-gradient(rgba(255, 255, 255, 0.12) 1px, transparent 1px), linear-gradient(90deg, rgba(255, 255, 255, 0.12) 1px, transparent 1px), linear-gradient(rgba(255, 255, 255, 0.05) 1px, transparent 1px), linear-gradient(90deg, rgba(255, 255, 255, 0.05) 1px, transparent 1px);
+  --paper-size: 80px 80px, 80px 80px, 16px 16px, 16px 16px;
+  color-scheme: dark;
+}
+
+/* รุ่งอรุณ: Rosé Pine Dawn (rosepinetheme.com), a band of rock layers under the header */
+[data-theme='dawn'] {
+  --bg: #faf4ed;
+  --raise: #f2e9e1;
+  --raise-2: #e6ddd6;
+  --rule: #dfdad9;
+  --rule-strong: #9893a5;
+  --text: #575279;
+  --text-2: #625e80;
+  --text-3: #736f8e;
+  --accent: #286983;
+  --accent-ink: #faf4ed;
+  --accent-soft: rgba(40, 105, 131, 0.13);
+  --sym: #b4637a;
+  --good: #3f7f66;
+  --fair: #ad6d14;
+  --bad: #b4637a;
+  --info: #286983;
+  --chip: rgba(250, 244, 237, 0.94);
+  --focus: #907aa9;
+  --tab-on: #286983;
+  --btn-edge: transparent;
+  --bar: linear-gradient(180deg, #f2e9e1, #faf4ed);
+  --bar-edge: 0 solid transparent;
+  --bar-band: linear-gradient(#d7827e 0 20%, #ea9d34 20% 40%, #56949f 40% 60%, #907aa9 60% 80%, #286983 80% 100%);
+  --bar-band-h: 5px;
+  --accent-fill: linear-gradient(120deg, #286983, #3b7f96);
+  color-scheme: light;
+}
+
+/* แสงเหนือ: Nord (nordtheme.com), aurora gradients on buttons and under the header */
+[data-theme='aurora'] {
+  --bg: #2e3440;
+  --raise: #3b4252;
+  --raise-2: #434c5e;
+  --rule: #4c566a;
+  --rule-strong: #67728a;
+  --text: #eceff4;
+  --text-2: #d8dee9;
+  --text-3: #9ca6b9;
+  --accent: #88c0d0;
+  --accent-ink: #2e3440;
+  --accent-soft: rgba(136, 192, 208, 0.16);
+  --sym: #ebcb8b;
+  --good: #a3be8c;
+  --fair: #d08770;
+  --bad: #bf616a;
+  --info: #81a1c1;
+  --chip: rgba(46, 52, 64, 0.88);
+  --focus: #88c0d0;
+  --tab-on: #88c0d0;
+  --btn-edge: transparent;
+  --bar-edge: 0 solid transparent;
+  --bar-band: linear-gradient(90deg, #a3be8c, #8fbcbb, #88c0d0, #b48ead);
+  --bar-band-h: 3px;
+  --accent-fill: linear-gradient(120deg, #8fbcbb, #88c0d0 45%, #b48ead);
+  --paper-img: radial-gradient(120% 60% at 12% -12%, rgba(163, 190, 140, 0.14), transparent 60%), radial-gradient(120% 60% at 92% -16%, rgba(180, 142, 173, 0.16), transparent 60%);
+  --paper-size: 100% 100%;
+  --paper-attach: scroll;
+  color-scheme: dark;
+}
+
+/* มอคค่า: Catppuccin Mocha (catppuccin.com), pastel mauve to pink */
+[data-theme='mocha'] {
+  --bg: #1e1e2e;
+  --raise: #313244;
+  --raise-2: #3a3c50;
+  --rule: #45475a;
+  --rule-strong: #6c7086;
+  --text: #cdd6f4;
+  --text-2: #bac2de;
+  --text-3: #9399b2;
+  --accent: #cba6f7;
+  --accent-ink: #1e1e2e;
+  --accent-soft: rgba(203, 166, 247, 0.16);
+  --sym: #f9e2af;
+  --good: #a6e3a1;
+  --fair: #fab387;
+  --bad: #f38ba8;
+  --info: #89b4fa;
+  --chip: rgba(24, 24, 37, 0.88);
+  --focus: #f5c2e7;
+  --tab-on: #cba6f7;
+  --btn-edge: transparent;
+  --bar: #181825;
+  --bar-edge: 1px solid #313244;
+  --accent-fill: linear-gradient(120deg, #cba6f7, #f5c2e7);
+  color-scheme: dark;
+}
+
+/* แสงแดงกลางคืน: only red light, to keep night vision; the map turns red too */
+[data-theme='redlight'] {
+  --bg: #000000;
+  --raise: #140303;
+  --raise-2: #210606;
+  --rule: #3a0c0c;
+  --rule-strong: #73201b;
+  --text: #ff5a4f;
+  --text-2: #d8443b;
+  --text-3: #b23a32;
+  --accent: #e0352b;
+  --accent-ink: #000000;
+  --accent-soft: rgba(224, 53, 43, 0.16);
+  --sym: #ff5a4f;
+  --good: #ff8a7a;
+  --fair: #d0463c;
+  --bad: #9e2a22;
+  --info: #ff7469;
+  --chip: rgba(0, 0, 0, 0.82);
+  --focus: #ff5a4f;
+  --tab-on: #ff5a4f;
+  --btn-edge: transparent;
+  --map-ink: #ff5a4f;
+  --map-filter: grayscale(1) brightness(0.62) sepia(1) saturate(5) hue-rotate(-38deg);
+  color-scheme: dark;
+}
+
 /* ---------- base ---------- */
 *, *::before, *::after { box-sizing: border-box; }
 html, body {
@@ -203,11 +421,12 @@ p { margin: 0; }
   align-items: center;
   min-height: 54px;
   padding: calc(var(--safe-t) + 2px) 6px 2px;
-  background: var(--bg);
-  border-bottom: 1px solid var(--rule);
+  background: var(--bar);
+  border-bottom: var(--bar-edge);
   position: relative;
   z-index: 20;
 }
+.topbar::after { content: ''; position: absolute; left: 0; right: 0; top: 100%; height: var(--bar-band-h); background: var(--bar-band); pointer-events: none; }
 .tb-side { display: flex; align-items: center; min-width: 0; }
 .tb-side.right { justify-content: flex-end; }
 .tb-title { text-align: center; min-width: 0; }
@@ -228,14 +447,15 @@ a.brand:active { background: var(--raise-2); }
 .save-state.saving { color: var(--text-2); }
 .save-state.error { color: var(--bad); }
 
-main#view { flex: 1; overflow-y: auto; overflow-x: hidden; -webkit-overflow-scrolling: touch; position: relative; }
+main#view { flex: 1; overflow-y: auto; overflow-x: hidden; -webkit-overflow-scrolling: touch; position: relative;
+  background-color: var(--bg); background-image: var(--paper-img); background-size: var(--paper-size); background-attachment: var(--paper-attach); }
 main#view:focus { outline: none; }
 
 .tabbar {
   flex: none;
   display: grid;
   grid-template-columns: repeat(4, 1fr);
-  background: var(--bg);
+  background: var(--bar);
   border-top: 1px solid var(--rule);
   /* sit low, like v0.4 in the browser: only part of the home-indicator area is kept free */
   padding-bottom: max(2px, calc(var(--safe-b) - 18px));
@@ -294,7 +514,7 @@ main#view:focus { outline: none; }
   min-height: 54px; padding: 0 20px;
   border: 2px solid var(--btn-edge);
   border-radius: var(--r-lg);
-  background: var(--accent); color: var(--accent-ink);
+  background: var(--accent-fill); color: var(--accent-ink);
   font-size: 16px; font-weight: 600; letter-spacing: 0.06em;
 }
 .btn-primary .i { stroke-width: 2.1; }
@@ -556,6 +776,7 @@ textarea:focus { background-image: repeating-linear-gradient(to bottom, transpar
   background-size: 40px 40px;
 }
 [data-mode='dark'] .leaflet-tile-pane { filter: brightness(0.74) saturate(0.85) contrast(1.05); }
+[data-theme='redlight'] .leaflet-container { filter: var(--map-filter); }
 .leaflet-container .leaflet-control-attribution { background: var(--chip); color: var(--text-3); font-size: 10px; padding: 1px 6px; border-top-left-radius: 6px; }
 .leaflet-container .leaflet-control-attribution a { color: var(--text-2); }
 .leaflet-container .leaflet-control-scale-line { background: var(--chip); border-color: var(--text-2); color: var(--text); font-family: var(--mono); font-size: 11px; text-shadow: none; }
@@ -843,6 +1064,11 @@ textarea:focus { background-image: repeating-linear-gradient(to bottom, transpar
 .loc-rows > div.sub { border-top: 0; padding-top: 0; }
 .loc-rows .sub dt { font-size: 12px; color: var(--text-3); }
 .loc-rows .sub dd { font-size: 15px; color: var(--text-2); }
+/* Lat/Long in full under UTM (GPS and Station screens) */
+.ro-row.ll { grid-template-columns: auto 1fr; margin-top: -3px; }
+.ro-row.ll dd { font-size: 15px; letter-spacing: 0; }
+.loc-rows > div.ll { margin-top: -3px; }
+.loc-rows .ll dd { font-size: 14px; }
 
 /* ---------- v0.5: the GPS screen fits the screen and does not scroll ---------- */
 main#view.view-gps { overflow: hidden; display: flex; flex-direction: column; }
@@ -1009,16 +1235,17 @@ body:has(#overlay .lightbox) #toast { top: calc(var(--safe-t) + 16px); bottom: a
 #btnCmp { border-color: var(--accent); color: var(--accent); }
 .base-btn:active { background: var(--raise-2); }
 .base-btn.on { border-color: var(--accent); }
-.fab-base { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 1px; height: auto; min-height: 50px; padding: 5px 0 4px; }
-.fab-base .i { width: 20px; height: 20px; }
-.fab-base span { font-size: 9.5px; font-weight: 600; line-height: 1.1; }
+/* Map buttons with a word under the icon (หน่วยหิน, แผนที่/ดาวเทียม/ออฟไลน์): a little larger
+   than the icon-only ones, icon and word centred with room above and below */
+.fab-base, .fab-geol { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 3px; width: 60px; height: auto; min-height: 60px; padding: 8px 3px 7px; }
+.fab-base .i, .fab-geol .i { width: 23px; height: 23px; }
+.fab-base span, .fab-geol span { font-size: 11px; font-weight: 600; line-height: 1.15; white-space: nowrap; }
+.map-fabs .fab:not(.fab-base):not(.fab-geol) { width: 60px; }
 .fab-base.on { border-color: var(--accent); }
 .is-sat .leaflet-control-attribution { max-width: calc(100% - 8px); white-space: normal; line-height: 1.3; }
 @media (max-height: 700px) { .view-gps .base-btn { min-height: 46px; width: 60px; } }
 
 /* rock units layer (v0.9) */
-.fab-geol { width: auto; min-width: 50px; padding: 0 8px; display: flex; flex-direction: column; gap: 1px; font-size: 10px; line-height: 1.1; }
-.fab-geol svg { width: 22px; height: 22px; }
 .fab-geol.on { border-color: var(--accent); color: var(--accent); }
 .geol-dl { position: absolute; left: 50%; transform: translateX(-50%); bottom: 26px; z-index: 1000; display: flex; align-items: center; gap: 6px; padding: 8px 14px; border-radius: 999px; border: 1px solid var(--rule-strong); background: var(--bg); color: var(--text); font-size: 13px; box-shadow: 0 6px 20px -8px rgba(0, 0, 0, 0.7); max-width: calc(100% - 150px); white-space: nowrap; }
 .geol-dl svg { width: 16px; height: 16px; flex: none; }
@@ -1043,16 +1270,28 @@ body:has(#overlay .lightbox) #toast { top: calc(var(--safe-t) + 16px); bottom: a
 .reg-btns { grid-area: btns; display: flex; gap: 6px; }
 .reg-btns .btn { white-space: nowrap; }
 
-/* theme picker (Settings → ธีมสี) */
+/* theme picker (Settings → ธีมสี): each card draws a small app screen in its own theme */
+.theme-group { margin: 12px 0 8px; font-size: 13px; font-weight: 600; color: var(--text-2); }
+.theme-group:first-of-type { margin-top: 6px; }
 .theme-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
-.theme-card { display: flex; flex-direction: column; align-items: stretch; gap: 4px; padding: 8px 8px 10px; border: 1.5px solid var(--rule); border-radius: var(--r-lg); background: var(--raise); text-align: left; min-width: 0; }
+.theme-card { display: flex; flex-direction: column; align-items: stretch; gap: 4px; padding: 7px 7px 10px; border: 1.5px solid var(--rule); border-radius: var(--r-lg); background: var(--raise); text-align: left; min-width: 0; }
 .theme-card[aria-checked='true'] { border-color: var(--accent); box-shadow: 0 0 0 1.5px var(--accent); }
-.theme-prev { display: flex; align-items: flex-end; gap: 5px; height: 54px; padding: 8px; border-radius: 9px; box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.12); }
-.theme-prev i { display: block; border-radius: 4px; }
-.theme-prev i:nth-child(1) { width: 38%; height: 100%; }
-.theme-prev i:nth-child(2) { width: 22%; height: 62%; }
-.theme-prev i:nth-child(3) { width: 14%; height: 38%; }
-.theme-card b { display: flex; align-items: baseline; gap: 6px; margin-top: 2px; font-size: 15px; font-weight: 600; }
+.tp {
+  position: relative; display: block; height: 96px; border-radius: 9px; overflow: hidden;
+  background-color: var(--bg); background-image: var(--paper-img); background-size: var(--paper-size);
+  box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.12);
+}
+.tp i { position: absolute; display: block; }
+.tp .tp-bar { left: 0; right: 0; top: 0; height: 19px; background: var(--bar); border-bottom: var(--bar-edge); }
+.tp .tp-bar::after { content: ''; position: absolute; left: 0; right: 0; top: 100%; height: calc(var(--bar-band-h) * 0.7); background: var(--bar-band); }
+.tp .tp-bar i { left: 50%; top: 7px; width: 30px; height: 5px; border-radius: 3px; background: var(--text); transform: translateX(-50%); }
+.tp .tp-l1 { left: 10px; top: 32px; width: 58%; height: 5px; border-radius: 3px; background: var(--text); }
+.tp .tp-l2 { left: 10px; top: 42px; width: 36%; height: 4px; border-radius: 2px; background: var(--text-3); }
+.tp .tp-btn { left: 10px; right: 10px; top: 54px; height: 16px; border-radius: 6px; background: var(--accent-fill); }
+.tp .tp-tab { left: 0; right: 0; bottom: 0; height: 17px; display: flex; align-items: center; justify-content: space-around; background: var(--bar); border-top: 1px solid var(--rule); }
+.tp .tp-tab i { position: static; width: 6px; height: 6px; border-radius: 50%; background: var(--text-3); opacity: 0.6; }
+.tp .tp-tab i.on { background: var(--tab-on); opacity: 1; }
+.theme-card b { display: flex; align-items: baseline; gap: 6px; margin-top: 3px; font-size: 15px; font-weight: 600; line-height: 1.3; }
 .theme-card b small { font-size: 11px; font-weight: 500; color: var(--text-3); }
 .theme-desc { font-size: 12px; line-height: 1.35; color: var(--text-3); }
 
@@ -1086,3 +1325,4 @@ body:has(#overlay .lightbox) #toast { top: calc(var(--safe-t) + 16px); bottom: a
   .sp-icon, .sp-name, .sp-tag, .sp-foot { animation: none; }
   .sp-bar i { animation-duration: 2.9s; animation-timing-function: linear; }
 }
+.summary-screen .seg[data-k='background'] button { font-size: 14px; padding: 0 2px; }

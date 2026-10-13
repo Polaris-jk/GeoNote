@@ -109,6 +109,18 @@ export async function layer() {
 }
 
 /**
+ * Draw the stored region maps north up into a canvas, for pictures (the summary map).
+ * opts: { width, height, lat, lon, zoom, bounds: { west, south, east, north } }.
+ * Resolves { canvas, drawn }; drawn is 0 when no stored region reaches the area.
+ */
+export async function renderArea(opts) {
+  if (typeof LodestarOffline === 'undefined' || !LodestarOffline.renderArea) return { canvas: null, drawn: 0 };
+  const items = [...(await stored())].map(([id, blob]) => ({ id, blob }));
+  if (!items.length) return { canvas: null, drawn: 0 };
+  return LodestarOffline.renderArea(items, { flavor: 'light', lang: getLang(), ...opts });
+}
+
+/**
  * The Isan map "comes with the app": fetched in the background the first time the app is open
  * with internet, retried on later launches until it succeeds. Not again once the user removed it.
  */

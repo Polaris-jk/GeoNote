@@ -34,7 +34,7 @@ const fmtWhen = (meta) => fmtTaken(meta.taken) || (() => {
 })();
 
 /** Version of the strip layout; Smart Photos kept from an older layout are redrawn. */
-export const SMART_LAYOUT = 8;
+export const SMART_LAYOUT = 9; // v1.3: lat/long to 3 decimals
 
 /** The rows of the strip as [label, value] items. Also used for tests and plain-text captions. */
 export function stripContent({ st, project, meta, index, total, zoneLock, collector }) {
@@ -53,7 +53,8 @@ export function stripContent({ st, project, meta, index, total, zoneLock, collec
     if (g) big.push(['Grid Ref', g.gr, 'gr'], ['', `${u.zone}${u.band} ${g.square}`, 'sq']);
     const loc = [];
     if (u) loc.push([`UTM ${u.zone}${u.band}`, `E ${Math.round(u.easting)}  N ${Math.round(u.northing)}`]);
-    loc.push(['', `${Math.abs(L.lat).toFixed(6)}°${L.lat >= 0 ? 'N' : 'S'} ${Math.abs(L.lon).toFixed(6)}°${L.lon >= 0 ? 'E' : 'W'}`]);
+    // 3 decimals (≈100 m) is enough beside the grid reference and UTM, which carry the exact spot
+    loc.push(['', `${Math.abs(L.lat).toFixed(3)}°${L.lat >= 0 ? 'N' : 'S'} ${Math.abs(L.lon).toFixed(3)}°${L.lon >= 0 ? 'E' : 'W'}`]);
     if (L.alt != null) loc.push(['Elev.', `${Math.round(L.alt)} m`]);
     if (L.acc != null) loc.push(['±', `${fmtAcc(L.acc)} m`]);
     rows.push({ items: loc });

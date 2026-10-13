@@ -1,7 +1,10 @@
 // Draws the project summary as a portrait image (Instagram post 4:5 or story 9:16):
 // every station joined in the order it was recorded, the time at each station, total time
 // from first to last, a UTM grid, north arrow and scale bar. The map is zoomed — and turned
-// if that fills the frame better — to fit the stations. Optional OpenStreetMap background.
+// if that fills the frame better — to fit the stations.
+// Background: plain, OpenStreetMap, satellite imagery, or the offline map kept on the phone.
+// With no internet, OpenStreetMap and satellite fall back to the offline map when it covers
+// the area, so a picture can still be made in the field.
 
 import { toUTM } from './utm.js';
 import { metersBetween, hasMeasurement } from './geomath.js';
@@ -9,10 +12,11 @@ import { lithName } from './vocab.js';
 import { pad } from './util.js';
 import { roundRect, wrap, loadFonts, SANS, MONO } from './draw.js';
 import { t } from './i18n.js';
+import { pictureTiles } from './basemaps.js';
+import * as offline from './offlinemap.js';
 
 const R = 6378137;
 const D2R = Math.PI / 180;
-const TILES = 'https://tile.openstreetmap.org';
 
 export const FORMATS = { post: [1080, 1350], story: [1080, 1920] };
 
@@ -20,13 +24,13 @@ const THEMES = {
   dark: {
     bg: '#000000', mapBg: '#121516', text: '#ecebe3', text2: '#a8aaa3', text3: '#74776f',
     accent: '#f5c933', halo: 'rgba(0,0,0,0.9)', grid: 'rgba(236,235,227,0.13)', gridText: 'rgba(236,235,227,0.55)',
-    veil: 'rgba(0,0,0,0.5)', labelBg: 'rgba(0,0,0,0.74)', labelText: '#ffffff', ring: '#000000', frame: 'rgba(236,235,227,0.16)',
+    veil: { osm: 'rgba(0,0,0,0.5)', sat: 'rgba(0,0,0,0.26)', offline: 'rgba(0,0,0,0.45)' }, labelBg: 'rgba(0,0,0,0.74)', labelText: '#ffffff', ring: '#000000', frame: 'rgba(236,235,227,0.16)',
     timeText: '#f5c933', dipText: '#f5c933', leader: 'rgba(255,255,255,0.75)',
   },
   light: {
     bg: '#ffffff', mapBg: '#eeede7', text: '#0b0b0b', text2: '#3b3b37', text3: '#6c6c65',
     accent: '#f5c933', halo: 'rgba(0,0,0,0.92)', grid: 'rgba(0,0,0,0.12)', gridText: 'rgba(0,0,0,0.55)',
-    veil: 'rgba(255,255,255,0.22)', labelBg: 'rgba(255,255,255,0.92)', labelText: '#000000', ring: '#000000', frame: 'rgba(0,0,0,0.18)',
+    veil: { osm: 'rgba(255,255,255,0.22)', sat: 'rgba(255,255,255,0.05)', offline: 'rgba(255,255,255,0.12)' }, labelBg: 'rgba(255,255,255,0.92)', labelText: '#000000', ring: '#000000', frame: 'rgba(0,0,0,0.18)',
     timeText: '#7a5c00', dipText: '#f5c933', leader: 'rgba(0,0,0,0.7)', // dip numbers sit on a dark halo in both themes
   },
 };
@@ -52,20 +56,38 @@ function loadImage(url, ms = 8000) {
   return new Promise((resolve) => {
     const img = new Image();
     img.crossOrigin = 'anonymous';
-    const t = setTimeout(() => { img.src = ''; resolve(null); }, ms);
-    img.onload = () => { clearTimeout(t); resolve(img); };
-    img.onerror = () => { clearTimeout(t); resolve(null); };
+    const timer = setTimeout(() => { img.src = ''; resolve(null); }, ms);
+    img.onload = () => { clearTimeout(timer); resolve(img); };
+    img.onerror = () => { clearTimeout(timer); resolve(null); };
     img.src = url;
   });
 }
 
+// Tiles already loaded in this session, so changing an option (size, colours) redraws at once
+// instead of downloading and decoding every tile again. Failed tiles are not kept.
+const tileCache = new Map();
+function cachedTile(url) {
+  let job = tileCache.get(url);
+  if (!job) {
+    job = loadImage(url).then((img) => { if (!img) tileCache.delete(url); return img; });
+    tileCache.set(url, job);
+    if (tileCache.size > 400) tileCache.delete(tileCache.keys().next().value);
+  }
+  return job;
+}
+
+const OFFLINE_CREDIT = '© OpenStreetMap contributors · Protomaps';
+
 const NICE = [5, 10, 20, 25, 50, 100, 200, 250, 500, 1000, 2000, 2500, 5000, 10000, 20000, 25000, 50000, 100000];
 
 /**
- * @param {{project, stations, format?: 'post'|'story', theme?: 'dark'|'light', basemap?: boolean, rotate?: boolean, zoneLock?: number}} o
+ * @param {{project, stations, format?: 'post'|'story', theme?: 'dark'|'light',
+ *   background?: 'plain'|'osm'|'sat'|'offline', basemap?: boolean, rotate?: boolean, zoneLock?: number}} o
+ * `basemap` is the setting saved by v1.2 and earlier (true = OpenStreetMap, false = plain).
  */
 export async function renderSummary(o) {
-  const { project, format = 'post', theme = 'dark', basemap = true, rotate = true, zoneLock } = o;
+  const { project, format = 'post', theme = 'dark', rotate = true, zoneLock } = o;
+  const want = ['plain', 'osm', 'sat', 'offline'].includes(o.background) ? o.background : o.basemap === false ? 'plain' : 'osm';
   const C = THEMES[theme] || THEMES.dark;
   const [W, H] = FORMATS[format] || FORMATS.post;
   const story = format === 'story';
@@ -153,16 +175,29 @@ export async function renderSummary(o) {
   ctx.fill();
   ctx.clip();
 
-  let tilesDrawn = 0;
-  if (basemap) {
-    const corners = [[mapRect.x, mapRect.y], [mapRect.x + mapRect.w, mapRect.y], [mapRect.x, mapRect.y + mapRect.h], [mapRect.x + mapRect.w, mapRect.y + mapRect.h]].map(([X, Y]) => toMerc(X, Y));
-    const xs = corners.map((p) => p.x), ys = corners.map((p) => p.y);
-    let z = Math.min(19, Math.max(2, Math.floor(Math.log2((s * 2 * Math.PI * R) / 256) + 0.7)));
+  // ---------- background ----------
+  const zN = Math.log2((s * 2 * Math.PI * R) / 256); // web-map zoom whose pixels match this picture
+  const corners = [[mapRect.x, mapRect.y], [mapRect.x + mapRect.w, mapRect.y], [mapRect.x, mapRect.y + mapRect.h], [mapRect.x + mapRect.w, mapRect.y + mapRect.h]].map(([X, Y]) => toMerc(X, Y));
+  const xs = corners.map((p) => p.x), ys = corners.map((p) => p.y);
+  const area = { minX: Math.min(...xs), maxX: Math.max(...xs), minY: Math.min(...ys), maxY: Math.max(...ys) };
+  // canvas transform for an image whose pixel (0, 0) is at mercator (x0, yTop), k metres per pixel
+  const imageTransform = (x0, yTop, k) => ctx.setTransform(
+    s * k * cosT, s * k * sinT, -s * k * sinT, s * k * cosT,
+    cx + s * (cosT * x0 + sinT * yTop - rcx),
+    cy + s * (sinT * x0 - cosT * yTop - rcy),
+  );
+
+  /** Web-map tiles; resolves the number drawn. */
+  const drawTiles = async (src, kind) => {
+    // street maps one level coarser so their lettering stays readable when the picture is
+    // viewed small on a phone; imagery at full detail
+    const zWant = kind === 'osm' ? Math.floor(zN - 0.3) : Math.floor(zN + 0.4);
+    let z = Math.min(src.maxZoom, Math.max(2, zWant));
     let range;
     for (;;) {
       const n = 2 ** z, T = (2 * Math.PI * R) / n;
-      const tx0 = Math.floor((Math.min(...xs) + Math.PI * R) / T), tx1 = Math.floor((Math.max(...xs) + Math.PI * R) / T);
-      const ty0 = Math.floor((Math.PI * R - Math.max(...ys)) / T), ty1 = Math.floor((Math.PI * R - Math.min(...ys)) / T);
+      const tx0 = Math.floor((area.minX + Math.PI * R) / T), tx1 = Math.floor((area.maxX + Math.PI * R) / T);
+      const ty0 = Math.floor((Math.PI * R - area.maxY) / T), ty1 = Math.floor((Math.PI * R - area.minY) / T);
       range = { n, T, tx0, tx1, ty0: Math.max(0, ty0), ty1: Math.min(n - 1, ty1) };
       if ((tx1 - tx0 + 1) * (range.ty1 - range.ty0 + 1) <= 90 || z <= 2) break;
       z -= 1;
@@ -171,37 +206,81 @@ export async function renderSummary(o) {
     for (let tx = range.tx0; tx <= range.tx1; tx++) {
       for (let ty = range.ty0; ty <= range.ty1; ty++) {
         const wx = ((tx % range.n) + range.n) % range.n;
-        jobs.push(loadImage(`${TILES}/${z}/${wx}/${ty}.png`).then((img) => ({ img, tx, ty })));
+        jobs.push(cachedTile(src.url(z, wx, ty)).then((img) => ({ img, tx, ty })));
       }
     }
     const tiles = await Promise.all(jobs);
     const k = range.T / 256;
+    let drawn = 0;
     for (const { img, tx, ty } of tiles) {
       if (!img) continue;
-      const x0 = -Math.PI * R + tx * range.T;
-      const yTop = Math.PI * R - ty * range.T;
-      // tile pixel (px, py) → mercator (x0 + k·px, yTop − k·py) → canvas
-      ctx.setTransform(
-        s * k * cosT, s * k * sinT, -s * k * sinT, s * k * cosT,
-        cx + s * (cosT * x0 + sinT * yTop - rcx),
-        cy + s * (sinT * x0 - cosT * yTop - rcy),
-      );
+      imageTransform(-Math.PI * R + tx * range.T, Math.PI * R - ty * range.T, k);
       ctx.drawImage(img, -0.4, -0.4, 256.8, 256.8);
-      tilesDrawn += 1;
+      drawn += 1;
     }
     ctx.setTransform(1, 0, 0, 1, 0, 0);
-    if (tilesDrawn) {
-      ctx.fillStyle = C.veil;
-      ctx.fillRect(mapRect.x, mapRect.y, mapRect.w, mapRect.h);
+    return drawn;
+  };
+
+  /** The offline region maps on the phone (vector, drawn north up, then turned); true when drawn. */
+  const drawOffline = async () => {
+    let Z = Math.max(3, Math.min(18, Math.round(zN)));
+    let k, w, h;
+    for (;;) {
+      k = (2 * Math.PI * R) / (256 * 2 ** Z);
+      w = Math.ceil((area.maxX - area.minX) / k);
+      h = Math.ceil((area.maxY - area.minY) / k);
+      if ((w <= 2600 && h <= 2600) || Z <= 3) break;
+      Z -= 1;
     }
+    const mx = (area.minX + area.maxX) / 2, my = (area.minY + area.maxY) / 2;
+    const c = unmerc(mx, my);
+    const bounds = {
+      west: unmerc(area.minX, my).lon, east: unmerc(area.maxX, my).lon,
+      south: unmerc(mx, area.minY).lat, north: unmerc(mx, area.maxY).lat,
+    };
+    let out;
+    try {
+      out = await offline.renderArea({ width: w, height: h, lat: c.lat, lon: c.lon, zoom: Z, bounds, scale: 2 });
+    } catch { return false; }
+    if (!out?.drawn || !out.canvas) return false;
+    // the renderer puts lat/lon at the centre of its canvas
+    const ox = (mx + Math.PI * R) / k - w / 2, oy = (Math.PI * R - my) / k - h / 2;
+    imageTransform(ox * k - Math.PI * R, Math.PI * R - oy * k, k);
+    ctx.drawImage(out.canvas, 0, 0);
+    ctx.setTransform(1, 0, 0, 1, 0, 0);
+    return true;
+  };
+
+  let background = 'plain'; // what the picture really shows
+  let credit = '';
+  if (want === 'osm' || want === 'sat') {
+    try {
+      const src = await pictureTiles(want);
+      if (await drawTiles(src, want)) { background = want; credit = src.credit; }
+    } catch { /* no tiles: try the offline map below */ }
+  }
+  if (background === 'plain' && want !== 'plain' && await drawOffline()) {
+    background = 'offline';
+    credit = OFFLINE_CREDIT;
+  }
+  if (background !== 'plain') {
+    ctx.fillStyle = C.veil[background];
+    ctx.fillRect(mapRect.x, mapRect.y, mapRect.w, mapRect.h);
   }
 
+  // the credit line(s) the background needs, bottom right, never over the scale bar
+  ctx.font = `400 15px ${SANS}`;
+  const creditLines = credit ? wrap(ctx, credit, mapRect.w * 0.7 - 70, 2) : [];
+  const creditW = creditLines.length ? Math.max(...creditLines.map((l) => ctx.measureText(l).width)) + 16 : 0;
+  const creditH = creditLines.length * 20 + 8;
+
   // Map furniture that labels must not cover: north arrow (top right), scale bar (bottom left),
-  // OpenStreetMap credit (bottom right).
+  // the background credit (bottom right).
   const furniture = [
     { x: mapRect.x + mapRect.w - 92, y: mapRect.y + 12, w: 80, h: 80 },
     { x: mapRect.x + 10, y: mapRect.y + mapRect.h - 84, w: Math.min(mapRect.w * 0.3 + 40, 360), h: 76 },
-    ...(basemap ? [{ x: mapRect.x + mapRect.w - 300, y: mapRect.y + mapRect.h - 44, w: 290, h: 36 }] : []),
+    ...(creditLines.length ? [{ x: mapRect.x + mapRect.w - creditW - 24, y: mapRect.y + mapRect.h - creditH - 18, w: creditW + 14, h: creditH + 12 }] : []),
   ];
   const hit = (b, list) => list.some((o2) => b.x < o2.x + o2.w && b.x + b.w > o2.x && b.y < o2.y + o2.h && b.y + b.h > o2.y);
   const gridBoxes = [];
@@ -437,14 +516,15 @@ export async function renderSummary(o) {
     ctx.fillText(distText(len), bx, by - 18);
   }
 
-  if (tilesDrawn) {
+  if (creditLines.length) {
     ctx.font = `400 15px ${SANS}`;
-    const txt = '© OpenStreetMap contributors';
-    const w = ctx.measureText(txt).width;
-    roundRect(ctx, mapRect.x + mapRect.w - w - 30, mapRect.y + mapRect.h - 36, w + 16, 26, 8);
+    const bx = mapRect.x + mapRect.w - creditW - 14, by = mapRect.y + mapRect.h - creditH - 10;
+    roundRect(ctx, bx, by, creditW, creditH, 8);
     ctx.fillStyle = C.labelBg; ctx.fill();
     ctx.fillStyle = C.labelText;
-    ctx.fillText(txt, mapRect.x + mapRect.w - w - 22, mapRect.y + mapRect.h - 17);
+    ctx.textAlign = 'right';
+    creditLines.forEach((line, i) => ctx.fillText(line, bx + creditW - 8, by + 20 + i * 20));
+    ctx.textAlign = 'left';
   }
   ctx.restore();
 
@@ -487,7 +567,8 @@ export async function renderSummary(o) {
     width: W,
     height: H,
     rotation: best.deg,
-    tilesDrawn,
+    background, // what was drawn: 'plain' | 'osm' | 'sat' | 'offline'
+    tilesDrawn: background === 'plain' ? 0 : 1, // kept for v1.2 callers
     stats: { count: stations.length, durationMs: last - first, distance: dist },
   };
 }

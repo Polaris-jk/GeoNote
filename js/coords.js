@@ -30,6 +30,7 @@ export function coordRows(fix, mode = coordMode()) {
       return [
         [`Grid Ref<small>${u.zone}${u.band} ${g.square}</small>`, g.gr, 'gr'],
         ['UTM', `E ${Math.round(u.easting)}  N ${Math.round(u.northing)}`, 'sub'],
+        ['Lat/Long', fullLatLon(fix), 'sub ll'],
       ];
     }
   }
@@ -38,6 +39,14 @@ export function coordRows(fix, mode = coordMode()) {
     ['Latitude', fmtLat(fix.lat, fmt)],
     ['Longitude', fmtLon(fix.lon, fmt)],
   ];
+}
+
+/** Decimal degree as the GPS gave it: every decimal kept, up to 8 (≈1 mm; beyond is rounding noise). */
+export const fullDeg = (v) => String(Number(v.toFixed(8)));
+
+/** "16.4741237, 102.8231054" — the Lat/Long row under UTM, in full. */
+export function fullLatLon(fix) {
+  return `${fullDeg(fix.lat)}, ${fullDeg(fix.lon)}`;
 }
 
 /** Text put on the clipboard by the copy button. */
@@ -72,6 +81,6 @@ export function fixAge(fix, now = Date.now()) {
 
 /** Rows with dashes before there is a fix, in the same layout. */
 export function emptyRows(mode = coordMode()) {
-  if (mode === 'utm') return [['Grid Ref<small>—</small>', '— —', 'gr'], ['UTM', 'E —  N —', 'sub']];
+  if (mode === 'utm') return [['Grid Ref<small>—</small>', '— —', 'gr'], ['UTM', 'E —  N —', 'sub'], ['Lat/Long', '—', 'sub ll']];
   return [['Latitude', '—'], ['Longitude', '—']];
 }

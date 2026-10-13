@@ -155,6 +155,46 @@ const GoogleLayer = L.TileLayer.extend({
 });
 
 /**
+ * Tiles for drawing a background into a picture (the summary map): 'osm' or 'sat'.
+ * Resolves { url(z, x, y), maxZoom, credit } — credit is the text the picture must carry.
+ */
+export async function pictureTiles(kind) {
+  if (kind === 'sat') {
+    const src = satelliteSource();
+    if (src.id === 'google') {
+      try {
+        const s = await googleSession();
+        return {
+          url: (z, x, y) => `https://tile.googleapis.com/v1/2dtiles/${z}/${x}/${y}?session=${encodeURIComponent(s)}&key=${encodeURIComponent(GOOGLE_MAPS_API_KEY)}`,
+          maxZoom: 19,
+          credit: 'Imagery © Google',
+        };
+      } catch {
+        googleBroken = true;
+        return pictureTiles('sat');
+      }
+    }
+    if (src.id === 'esri') {
+      return {
+        url: (z, x, y) => `https://ibasemaps-api.arcgis.com/arcgis/rest/services/World_Imagery/MapServer/tile/${z}/${y}/${x}?token=${encodeURIComponent(ARCGIS_API_KEY)}`,
+        maxZoom: 18,
+        credit: 'Powered by Esri · Esri, Maxar, Earthstar Geographics, and the GIS User Community',
+      };
+    }
+    return {
+      url: (z, x, y) => `https://tiles.maps.eox.at/wmts/1.0.0/s2cloudless-${EOX_YEAR}_3857/default/g/${z}/${y}/${x}.jpg`,
+      maxZoom: 16,
+      credit: `Sentinel-2 cloudless by EOX IT Services GmbH (Contains modified Copernicus Sentinel data ${EOX_YEAR})`,
+    };
+  }
+  return {
+    url: (z, x, y) => `https://tile.openstreetmap.org/${z}/${x}/${y}.png`,
+    maxZoom: 19,
+    credit: '© OpenStreetMap contributors',
+  };
+}
+
+/**
  * Tile layer for 'map' (street map) or 'sat' (satellite). `compact`: shorter credits (mini map).
  * A satellite layer may fire 'sourcefail' when its imagery cannot be used; then ask for a new one.
  */
