@@ -15,6 +15,7 @@ import * as geol from '../geology.js';
 import { regionAt, regionName } from '../regions.js';
 import { downloadRegion } from './offline-dl.js';
 import { t } from '../i18n.js';
+import { walkEnds, shapeOf, shapeName, shapeSVG } from '../pointtype.js';
 
 export async function render(root, ctx) {
   mainHeader();
@@ -42,12 +43,17 @@ export async function render(root, ctx) {
   // legend: what each pin colour means
   const lg = root.querySelector('#mapLegend');
   const entries = legend(list.filter((s) => s.location));
+  // point symbols in use: square station, circle check point, triangle first/last of the walk
+  const ends = walkEnds(list);
+  const used = new Set(list.filter((s) => s.location).map((s) => shapeOf(s, ends)));
+  const kinds = ['square', 'circle', 'tri'].filter((k) => used.has(k));
   if (entries.length) {
     let open = store.getSettings().legendOpen !== false;
     const paint = () => {
       lg.classList.toggle('closed', !open);
       lg.innerHTML = `<button type="button" class="lg-head" aria-expanded="${open}">${t('สัญลักษณ์สีหิน', 'Rock colours')}<span>${open ? '−' : '+'}</span></button>
-        ${open ? `<ul>${entries.map((e) => `<li><i style="background:${e.color}"></i><span><b>${esc(e.name)}</b>${e.th ? ` ${esc(e.th)}` : ''}<small>${esc(e.note)}</small></span><em>${e.n}</em></li>`).join('')}</ul>` : ''}`;
+        ${open ? `<ul>${entries.map((e) => `<li><i style="background:${e.color}"></i><span><b>${esc(e.name)}</b>${e.th ? ` ${esc(e.th)}` : ''}<small>${esc(e.note)}</small></span><em>${e.n}</em></li>`).join('')}</ul>
+          <p class="lg-kinds">${kinds.map((k) => `<span>${shapeSVG(k, '#ffffff', 'pt-shape sm')}${esc(shapeName(k))}</span>`).join('')}</p>` : ''}`;
     };
     lg.classList.remove('hidden');
     paint();

@@ -12,11 +12,12 @@ import { hasMeasurement, az3 } from './geomath.js';
 import { smartName } from './smartphoto.js';
 import { smartFor } from './smartauto.js';
 import { t } from './i18n.js';
+import { pointType, typeName } from './pointtype.js';
 
 const r = (v, d) => (v == null || !Number.isFinite(v) ? null : Number(v.toFixed(d)));
 
 export const STATION_COLS = [
-  'project', 'station', 'status', 'date', 'time', 'lat', 'lon', 'utm_zone', 'utm_e', 'utm_n', 'utm_epsg', 'grid_ref', 'mgrs',
+  'project', 'station', 'point_type', 'status', 'date', 'time', 'lat', 'lon', 'utm_zone', 'utm_e', 'utm_n', 'utm_epsg', 'grid_ref', 'mgrs',
   'elev_m', 'elev_ref', 'elev_acc_m', 'acc_m', 'fix_method', 'fix_n',
   'lithology', 'lithology_th', 'weathering', 'color',
   'struct_type', 'strike', 'dip', 'dip_dir', 'n_struct',
@@ -58,6 +59,7 @@ function stationRow(st, project) {
   return {
     project: project.name,
     station: st.code,
+    point_type: typeName(pointType(st)), // Station (strike/dip measured, or set by hand) / Check point
     status: st.status,
     date: isoDate(t),
     time: `${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`,
@@ -150,6 +152,7 @@ function describe(st) {
   const m = (st.measurements || []).filter(hasMeasurement);
   const p = place(st);
   const lines = [
+    `Type: ${typeName(pointType(st))}`,
     lithName(st) && `Lithology: ${lithName(st)}`,
     st.weathering && `Weathering: ${weatheringLabel(st.weathering)}`,
     st.color && `Color: ${st.color}`,

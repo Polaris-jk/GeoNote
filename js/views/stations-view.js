@@ -1,5 +1,6 @@
 // Stations — the notebook index for the current project.
-// Tap a row to read it; swipe a row left for Edit / Delete; Export and the summary map live here.
+// Tap a row to read it; swipe a row left for Edit / Delete; Export, the summary map and the
+// cross section live here.
 
 import * as store from '../store.js';
 import { icon, strikeDipSymbol } from '../icons.js';
@@ -10,10 +11,12 @@ import { esc, fmtClock, fmtDay } from '../util.js';
 import { fmtPlane, hasMeasurement } from '../geomath.js';
 import { lithInfo, lithName } from '../vocab.js';
 import { t, isEn } from '../i18n.js';
+import { walkEnds, shapeOf, shapeName, shapeSVG } from '../pointtype.js';
+import { colorFor } from '../rockcolors.js';
 
 const plural = (n, word) => `${n} ${word}${n === 1 ? '' : 's'}`;
 
-function row(st) {
+function row(st, ends) {
   const m = (st.measurements || []).find((x) => hasMeasurement(x) && x.strike != null);
   const lith = lithName(st);
   const th = lithInfo(st.lithology)?.th;
@@ -29,7 +32,7 @@ function row(st) {
       <span class="st-thumb${nP ? '' : ' none'}" aria-hidden="true">${nP ? '' : icon('photo')}</span>
       <span class="st-num">${String(st.number).padStart(3, '0')}</span>
       <span class="st-body">
-        <span class="st-lith">${lith ? esc(lith) : `<span class="muted">${t('ยังไม่ระบุชนิดหิน', 'No rock type yet')}</span>`}${th && th !== lith && !isEn() ? `<i>${esc(th)}</i>` : ''}</span>
+        <span class="st-lith">${st.location ? `<span class="st-shape" title="${esc(shapeName(shapeOf(st, ends)))}">${shapeSVG(shapeOf(st, ends), colorFor(st), 'pt-shape sm')}</span>` : ''}${lith ? esc(lith) : `<span class="muted">${t('ยังไม่ระบุชนิดหิน', 'No rock type yet')}</span>`}${th && th !== lith && !isEn() ? `<i>${esc(th)}</i>` : ''}</span>
         <span class="st-meta">
           ${m ? `<span class="st-plane">${strikeDipSymbol(m.strike)}${fmtPlane(m) || ''}</span>` : ''}
           ${nS ? `<span title="${plural(nS, 'sample')}">${icon('sample')}${nS}</span>` : ''}
@@ -76,6 +79,7 @@ export async function render(root, ctx) {
     const list = await store.listStations();
     if (!ctx.alive()) return;
     const project = store.getProject();
+    const ends = walkEnds(list); // first and last point of the walk: triangles
     const samples = list.reduce((n, s) => n + (s.samples || []).length, 0);
     const photos = list.reduce((n, s) => n + (s.photoIds || []).length, 0);
 
@@ -90,10 +94,13 @@ export async function render(root, ctx) {
           <span><b>${samples}</b> Samples</span>
           <span><b>${photos}</b> Photos</span>
         </p>
-        ${list.length ? `<a class="btn summary-btn" href="#/summary">${icon('map')}${t('แผนที่สรุปโปรเจกต์', 'Project summary map')}</a>` : ''}
+        ${list.length ? `<div class="proj-btns">
+          <a class="btn" href="#/summary">${icon('map')}${t('แผนที่สรุป', 'Summary map')}</a>
+          <a class="btn" href="#/section">${icon('section')}${t('ภาพตัดขวาง', 'Cross section')}</a>
+        </div>` : ''}
       </header>
       ${list.length
-        ? `<ul class="st-list" id="stList">${list.map(row).join('')}</ul>
+        ? `<ul class="st-list" id="stList">${list.map((st) => row(st, ends)).join('')}</ul>
            <p class="hint swipe-hint">${t('ปัดรายการไปทางซ้ายเพื่อแก้ไขหรือลบ', 'Swipe a station left to edit or delete it')}</p>`
         : `<div class="empty">
             <p>${t('ยังไม่มี Station ในโปรเจกต์นี้', 'No stations in this project yet')}<br>${t('ไปที่หน้า GPS แล้วกด NEW STATION เมื่อเจอ outcrop แรก', 'Go to GPS and tap NEW STATION at your first outcrop')}</p>

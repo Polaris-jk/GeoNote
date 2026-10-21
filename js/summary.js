@@ -12,6 +12,7 @@ import { lithName } from './vocab.js';
 import { pad } from './util.js';
 import { roundRect, wrap, loadFonts, SANS, MONO } from './draw.js';
 import { t } from './i18n.js';
+import { pointType, pathShape } from './pointtype.js';
 import { pictureTiles } from './basemaps.js';
 import * as offline from './offlinemap.js';
 
@@ -420,13 +421,16 @@ export async function renderSummary(o) {
     return pick;
   };
 
-  for (const p of cpts) {
+  // each point: its symbol (js/pointtype.js) — square = station, circle = check point, triangle =
+  // first and last point of the walk — with the strike/dip symbol, when measured, coming out of it
+  for (const [i, p] of cpts.entries()) {
     const m = (p.s.measurements || []).find((x) => hasMeasurement(x) && x.strike != null);
+    const shape = i === 0 || i === cpts.length - 1 ? 'tri' : pointType(p.s) === 'station' ? 'square' : 'circle';
     if (m) {
       const a = (m.strike + best.deg) * D2R;
       const dx = Math.sin(a), dy = -Math.cos(a); // along strike on canvas
       const tx = Math.cos(a), ty = Math.sin(a); // towards dip direction (90° clockwise)
-      const L = 26, T = 15;
+      const L = 28, T = 24;
       for (const [col, w] of [[C.halo, 11], [C.accent, 5]]) {
         ctx.strokeStyle = col; ctx.lineWidth = w; ctx.lineCap = 'round';
         ctx.beginPath();
@@ -445,12 +449,10 @@ export async function renderSummary(o) {
         ctx.fillStyle = C.dipText; ctx.fillText(txt, lx, ly);
         obstacles.push({ x: lx - 4, y: ly - 20, w: w + 8, h: 26, wt: 30 });
       }
-    } else {
-      ctx.beginPath();
-      ctx.arc(p.X, p.Y, 12, 0, Math.PI * 2);
-      ctx.fillStyle = C.accent; ctx.fill();
-      ctx.lineWidth = 4; ctx.strokeStyle = C.ring; ctx.stroke();
     }
+    pathShape(ctx, shape, p.X, p.Y, m ? 10.5 : 12);
+    ctx.fillStyle = C.accent; ctx.fill();
+    ctx.lineWidth = 4; ctx.lineJoin = 'round'; ctx.strokeStyle = C.ring; ctx.stroke();
   }
 
   // labels: code + recorded time, placed where they don't collide

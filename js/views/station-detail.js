@@ -10,6 +10,8 @@ import { openGallery } from '../gallery.js';
 import { esc, pad, fmtClock, fmtDay } from '../util.js';
 import { az3, fmtPlane, hasMeasurement, accClass, fmtAcc } from '../geomath.js';
 import { t, isEn } from '../i18n.js';
+import { pointType, isAutoType, typeName, shapeSVG } from '../pointtype.js';
+import { colorFor } from '../rockcolors.js';
 
 const structTH = (en) => STRUCTURE_TYPES.find(([e]) => e === en)?.[1] || '';
 
@@ -49,7 +51,7 @@ export async function render(root, ctx, id) {
 
   root.innerHTML = `<div class="screen page detail-screen">
     <header class="dt-hero">
-      <p class="dt-code">${esc(st.code)}${st.status === 'draft' ? '<em class="draft">Draft</em>' : ''}</p>
+      <p class="dt-code">${esc(st.code)}${st.status === 'draft' ? '<em class="draft">Draft</em>' : ''}<span class="kind-tag">${shapeSVG(pointType(st) === 'station' ? 'square' : 'circle', colorFor(st), 'pt-shape sm')}${typeName(pointType(st))}${isAutoType(st) ? `<small>${t('อัตโนมัติ', 'auto')}</small>` : ''}</span></p>
       <h1 class="dt-lith">${lith ? esc(lith) : `<span class="muted">${t('ยังไม่ระบุชนิดหิน', 'No rock type yet')}</span>`}${info && info.th !== lith && !isEn() ? `<i>${esc(info.th)}</i>` : ''}</h1>
       <p class="dt-time">${t(`บันทึกเมื่อ ${fmtClock(st.createdAt)} น. ${fmtDay(st.createdAt)}`, `Recorded ${fmtClock(st.createdAt)}, ${fmtDay(st.createdAt)}`)}</p>
     </header>

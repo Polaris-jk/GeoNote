@@ -1,5 +1,6 @@
 // GeoNote — boot and screen routing:
-// #/gps  #/map  #/stations  #/station/<id> (read-only)  #/station/<id>/edit  #/projects  #/summary  #/settings
+// #/gps  #/map  #/stations  #/station/<id> (read-only)  #/station/<id>/edit  #/projects  #/summary
+// #/section (cross section)  #/settings
 
 import * as store from './store.js';
 import * as gps from './gps.js';
@@ -13,6 +14,7 @@ import * as stationsView from './views/stations-view.js';
 import * as stationView from './views/station-view.js';
 import * as stationDetail from './views/station-detail.js';
 import * as summaryView from './views/summary-view.js';
+import * as sectionView from './views/section-view.js';
 import * as settingsView from './views/settings-view.js';
 import * as projectsView from './views/projects-view.js';
 import { t, getLang, setLang } from './i18n.js';
@@ -24,6 +26,7 @@ const ROUTES = {
   station: stationDetail.render,
   stationEdit: stationView.render,
   summary: summaryView.render,
+  section: sectionView.render,
   settings: settingsView.render,
   projects: projectsView.render,
 };
@@ -55,7 +58,7 @@ async function route() {
   const root = document.createElement('div');
   root.className = 'view-root';
   host.appendChild(root);
-  const isSub = ['station', 'stationEdit', 'projects', 'summary'].includes(view);
+  const isSub = ['station', 'stationEdit', 'projects', 'summary', 'section'].includes(view);
   setTabbar(!isSub, isSub ? '' : view);
 
   try {

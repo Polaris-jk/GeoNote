@@ -7,6 +7,7 @@ import { icon } from '../icons.js';
 import { openCalibration } from './clino.js';
 import * as offline from '../offlinemap.js';
 import * as geol from '../geology.js';
+import * as dem from '../dem.js';
 import { THEMES, THEME_GROUPS, DEFAULT_THEME, themeName, themeDesc } from '../themes.js';
 import { downloadRegion } from './offline-dl.js';
 import { REGIONS, regionById, regionName, regionNote, manifest } from '../regions.js';
@@ -182,13 +183,27 @@ export async function render(root) {
         </div>
       </div>`);
     }
+    // ground heights for cross sections: kept by area (map button on the Map screen), not by region
+    const d = await dem.storedInfo();
+    rows.push(`<div class="reg-row">
+        <div class="reg-name"><b>${t('ความสูงพื้นดิน (DEM)', 'Ground heights (DEM)')}</b><small>${t('สำหรับภาพตัดขวาง เก็บเป็นบริเวณ ดาวน์โหลดที่ปุ่มแผนที่ในหน้า Map', 'For cross sections, kept by area: download with the map button on the Map screen')}</small></div>
+        <div class="reg-state"><span class="${d.count ? 'ok' : ''}">${d.count ? t(`ในเครื่อง ${fmtSize(d.bytes)}`, `${fmtSize(d.bytes)} on this phone`) : t('ยังไม่มี', 'none yet')}</span></div>
+        <div class="reg-btns">${d.count ? `<button type="button" class="btn sm" data-rmdem aria-label="${t('ลบความสูงพื้นดินทั้งหมด', 'Delete all ground heights')}">${icon('trash')}</button>` : ''}</div>
+      </div>`);
     const dlNow = offline.busy();
     box.innerHTML = `${rows.join('')}
       ${dlNow ? `<p class="hint">${t('กำลังดาวน์โหลดแผนที่อยู่ หน้านี้จะอัปเดตเมื่อเสร็จ', 'A map is downloading; this list updates when it finishes')}</p>` : ''}
       <p class="hint">${t('แตะปุ่มดาวน์โหลดตอนต่อ Wi-Fi ก่อนออกภาคสนาม ได้ทั้งแผนที่ถนนและหน่วยหินของภาคนั้น ใช้ได้โดยไม่ต้องต่อเน็ต เมื่อไม่มีเน็ต แผนที่ในหน้า GPS และ Map เปลี่ยนเป็นแผนที่ออฟไลน์ให้เอง ขอบเขตภาคเป็นเส้นตรงโดยประมาณ ถ้าพื้นที่สำรวจอยู่ใกล้รอยต่อให้โหลดทั้งสองภาค', 'Download on Wi-Fi before fieldwork: you get the street map and rock units of that region, usable with no internet. With no internet the GPS and Map screens switch to the offline map by themselves. Region borders are approximate straight lines; near a border, download both regions.')}</p>
-      <p class="hint">${t('แผนที่ © OpenStreetMap contributors · หน่วยหิน 1:250,000 © กรมทรัพยากรธรณี', 'Map © OpenStreetMap contributors · Rock units 1:250,000 © Department of Mineral Resources')}</p>`;
+      <p class="hint">${t('แผนที่ © OpenStreetMap contributors · หน่วยหิน 1:250,000 © กรมทรัพยากรธรณี · ความสูง Copernicus DEM GLO-30 (Mapterhorn)', 'Map © OpenStreetMap contributors · Rock units 1:250,000 © Department of Mineral Resources · Heights Copernicus DEM GLO-30 (Mapterhorn)')}</p>`;
   }
   root.querySelector('#offBox')?.addEventListener('click', async (e) => {
+    if (e.target.closest('[data-rmdem]')) {
+      if (!confirm(t('ลบความสูงพื้นดิน (DEM) ทุกบริเวณออกจากเครื่อง? ภาพตัดขวางจะโหลดใหม่เมื่อมีเน็ต', 'Delete the ground heights (DEM) of every area from this phone? Cross sections load them again when online.'))) return;
+      await dem.clear();
+      toast(t('ลบความสูงพื้นดินแล้ว', 'Ground heights deleted'));
+      renderOffline(); renderStorage();
+      return;
+    }
     const dl = e.target.closest('[data-dl]');
     const rm = e.target.closest('[data-rm]');
     if (dl) {

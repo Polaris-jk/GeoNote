@@ -2,16 +2,31 @@
 //   แผนที่      OpenStreetMap online (towns, roads)
 //   ดาวเทียม    satellite imagery (online)
 //   ออฟไลน์     region maps kept on the phone, also used automatically when there is no internet
-// The choice is remembered and shared by both screens.
+// The choice is remembered and shared by both screens. The same sheet downloads the ground heights
+// (DEM) of the area on screen for cross sections with no internet.
 
 import * as store from '../store.js';
 import { satelliteSource } from '../basemaps.js';
 import * as offline from '../offlinemap.js';
+import * as dem from '../dem.js';
 import { icon } from '../icons.js';
 import { toast, openOverlay } from '../ui.js';
 import { REGIONS, regionAt, regionName } from '../regions.js';
-import { downloadRegion } from './offline-dl.js';
+import { downloadRegion, downloadDem } from './offline-dl.js';
+import { fmtSize } from '../util.js';
 import { t } from '../i18n.js';
+
+/** The map's view as a lat/lon box, widened to at least about 12 × 12 km around its middle. */
+function demBox(map) {
+  const b = map.getBounds();
+  const c = map.getCenter();
+  const dLat = 6000 / 110574;
+  const dLon = 6000 / (111320 * Math.cos((c.lat * Math.PI) / 180));
+  return {
+    south: Math.min(b.getSouth(), c.lat - dLat), north: Math.max(b.getNorth(), c.lat + dLat),
+    west: Math.min(b.getWest(), c.lng - dLon), east: Math.max(b.getEast(), c.lng + dLon),
+  };
+}
 
 const LABEL = {
   get map() { return t('แผนที่', 'Map'); },
@@ -32,6 +47,7 @@ export function wireBasemapButton(btn, m) {
     e.preventDefault();
     e.stopPropagation();
     const have = await offline.stored();
+    const demInfo = await dem.storedInfo();
     const c = m.map.getCenter();
     const here = regionAt(c.lat, c.lng);
     const cur = m.basemap();
@@ -53,11 +69,17 @@ export function wireBasemapButton(btn, m) {
           ${opt('offline', t('แผนที่ออฟไลน์', 'Offline map'), offDesc)}
         </div>
         ${hereMissing && have.size ? `<button type="button" class="btn block" data-dl="${here.id}">${icon('download')}${t(`ดาวน์โหลดแผนที่${regionName(here)}`, `Download the ${regionName(here)} map`)}</button>` : ''}
+        <div class="dem-box">
+          <b>${icon('section')}${t('ความสูงพื้นดิน (DEM) สำหรับภาพตัดขวาง', 'Ground heights (DEM) for cross sections')}</b>
+          <span>${demInfo.count ? t(`ในเครื่อง ${fmtSize(demInfo.bytes)}`, `On this phone: ${fmtSize(demInfo.bytes)}`) : t('ยังไม่มีในเครื่อง', 'None on this phone yet')} · ${t('โหลดบริเวณที่เห็นบนจอไว้ก่อนออกสนาม ภาพตัดขวางจะใช้ได้แม้ไม่มีเน็ต', 'Download the area on screen before fieldwork and cross sections work with no internet')}</span>
+          <button type="button" class="btn block" data-dem>${icon('download')}${t('ดาวน์โหลดความสูงบริเวณนี้', 'Download heights for this area')}</button>
+        </div>
         <a class="btn block" href="#/settings" data-close>${t('ข้อมูลออฟไลน์ทุกภาค (Settings)', 'Offline data for every region (Settings)')}</a>
       </div>`, {
       onClick: async (ev, close) => {
         const dl = ev.target.closest('[data-dl]');
         if (dl) { close(); await downloadRegion(dl.dataset.dl, { rocks: false }); return; }
+        if (ev.target.closest('[data-dem]')) { const box = demBox(m.map); close(); await downloadDem(box); return; }
         const b = ev.target.closest('[data-b]');
         if (!b) return;
         const kind = b.dataset.b;

@@ -12,17 +12,20 @@ import { baseLayer, satelliteSource } from './basemaps.js';
 import { toast } from './ui.js';
 import * as offline from './offlinemap.js';
 import { t } from './i18n.js';
+import { walkEnds, shapeOf, shapeSVG, pointType, typeName } from './pointtype.js';
 
 const THAILAND = [15.5, 101.2];
 
 const firstMeas = (st) => (st.measurements || []).find((m) => hasMeasurement(m) && m.strike != null) || null;
 
-function stationIcon(st) {
+function stationIcon(st, ends) {
   const m = firstMeas(st);
   const lith = lithName(st);
   const g = st.location ? gridRef(toUTM(st.location.lat, st.location.lon, store.zoneLock())) : null;
-  // pin in the rock's colour; the strike/dip symbol, when measured, is drawn over it
-  let sym = `<i class="rk" style="background:${colorFor(st)}"></i>`;
+  // pin in the rock's colour, shaped by the kind of point (js/pointtype.js): square = station,
+  // circle = check point, triangle = first or last point of the walk; the strike/dip symbol,
+  // when measured, is drawn over it
+  let sym = shapeSVG(shapeOf(st, ends), colorFor(st), 'rk');
   if (m) {
     const dd = ((m.dipdir ?? m.strike + 90) * Math.PI) / 180;
     const x = 15 + Math.sin(dd) * 15.5;
@@ -45,7 +48,7 @@ function popupHTML(st) {
   const plane = m ? fmtPlane(m) : null;
   const lith = lithName(st);
   return `<div class="pp">
-    <b>${esc(st.code)}</b>
+    <b>${esc(st.code)} <small class="pp-kind">${typeName(pointType(st))}</small></b>
     <span>${lith ? esc(lith) : 'No lithology yet'}</span>
     ${plane ? `<span class="mono">${plane}${m.dipdir != null ? ` → ${az3(m.dipdir)}` : ''}</span>` : ''}
     <button type="button" class="btn sm" data-open>Open station</button>
@@ -141,11 +144,12 @@ export function createMap(el, { interactive = true } = {}) {
     setStations(list, onOpen) {
       stationLayer.clearLayers();
       const pts = [];
+      const ends = walkEnds(list);
       for (const st of list) {
         if (!st.location) continue;
         const ll = [st.location.lat, st.location.lon];
         pts.push(ll);
-        const mk = L.marker(ll, { icon: stationIcon(st), keyboard: false, riseOnHover: true });
+        const mk = L.marker(ll, { icon: stationIcon(st, ends), keyboard: false, riseOnHover: true });
         if (onOpen) {
           mk.bindPopup(popupHTML(st), { closeButton: false, className: 'geo-popup', autoPanPadding: [24, 24] });
           mk.on('popupopen', (e) => {

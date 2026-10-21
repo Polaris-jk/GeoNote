@@ -6,7 +6,7 @@ import { hasMeasurement, norm360 } from './geomath.js';
 import { readExif } from './exif.js';
 import { t } from './i18n.js';
 
-export const APP_VERSION = '1.3.0';
+export const APP_VERSION = '1.4.0';
 
 const DEFAULTS = {
   projectId: null,
@@ -175,6 +175,8 @@ export async function deleteProject(id) {
       }
     });
   });
+  // the project's cross section settings and changes (js/xsection.js)
+  await db.del('kv', `xsec-${id}`).catch(() => {});
   if (id === project.id) {
     const rest = (await db.getAll('projects')).sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0));
     if (rest.length) await switchProject(rest[0].id);

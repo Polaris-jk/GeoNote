@@ -34,6 +34,7 @@ const P = {
   download: '<path d="M12 3.5V15M7.5 10.5 12 15l4.5-4.5"/><path d="M5 15.5v3.6a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1v-3.6"/>',
   layers: '<path d="m12 3.5 9 4.6-9 4.6-9-4.6z"/><path d="m3 12.2 9 4.6 9-4.6M3 16.3l9 4.6 9-4.6"/>',
   edit: '<path d="M4 20h4L19.2 8.8a2 2 0 0 0 0-2.8l-1.2-1.2a2 2 0 0 0-2.8 0L4 16z"/><path d="m13.5 6.5 4 4"/>',
+  section: '<path d="m2.5 9.5 4-3.5 4 2.5 4.5-4 6.5 4.5"/><path d="M2.5 15 21.5 11.2M2.5 20 21.5 16.2" opacity=".6"/><path d="M8.2 7.3v11.5" stroke-dasharray="1.6 2"/>',
 };
 
 export function icon(name, cls = '') {

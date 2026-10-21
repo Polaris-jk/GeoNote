@@ -73,6 +73,19 @@ function newColor(text, used) {
   return hsl(best.h, 0.68, light);
 }
 
+/** Colour already decided for a rock name (quick-pick rock or one remembered from a station), or null. */
+export function knownColor(text) {
+  const lith = String(text || '').trim();
+  if (!lith) return null;
+  const key = rockKey(lith);
+  if (key) return ROCK_COLORS[key][0];
+  return customMap()[customKey(lith)] || null;
+}
+
+/** A new colour for a rock (cross section), well away from the quick-pick colours and `used`. */
+export const pickColor = (text, used = []) =>
+  newColor(String(text || ''), [...Object.values(ROCK_COLORS).map((c) => c[0]), ...used]);
+
 /** Colour of a station's pin. */
 export function colorFor(st) {
   const lith = String(st?.lithology || '').trim();

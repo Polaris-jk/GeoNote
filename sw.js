@@ -1,7 +1,7 @@
 // GeoNote service worker — makes the app open with no signal.
 // When you change any file, bump VERSION so phones download the new app.
 
-const VERSION = 'geo-v1.3.0';
+const VERSION = 'geo-v1.4.0';
 const SHELL_CACHE = `${VERSION}-shell`;
 const TILE_CACHE = 'geo-tiles-v1';
 const MAX_TILES = 2500; // roughly 40–60 MB of map you have viewed while online
@@ -48,6 +48,10 @@ const SHELL = [
   'js/regions.js',
   'js/themes.js',
   'js/i18n.js',
+  'js/pointtype.js',
+  'js/dem.js',
+  'js/xsection.js',
+  'js/views/section-view.js',
   'js/views/offline-dl.js',
   'data/rock_colors.json',
   'data/regions.json',

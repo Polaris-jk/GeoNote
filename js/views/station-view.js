@@ -15,6 +15,8 @@ import { openCamera } from './camera.js';
 import { finishStation, canAutoSave } from '../smartauto.js';
 import { esc, pad, debounce, parseNum, trim1, fmtClock, fmtDay, uuid } from '../util.js';
 import { strikeToDipDir, dipDirToStrike, accClass, fmtAcc } from '../geomath.js';
+import { pointType, isAutoType, typeName, shapeSVG } from '../pointtype.js';
+import { colorFor } from '../rockcolors.js';
 import { t, isEn } from '../i18n.js';
 
 const opt = (value, label, selected) => `<option value="${esc(value)}"${value === selected ? ' selected' : ''}>${esc(label)}</option>`;
@@ -72,6 +74,7 @@ export async function render(root, ctx, id) {
     store.freshIds.delete(st.id);
     setSaveState('saving');
     autosave();
+    paintKind(); // an automatic type follows the measurements as they are typed
   };
 
   const lithChips = LITHOLOGY.map(([en, th]) =>
@@ -86,6 +89,12 @@ export async function render(root, ctx, id) {
       <div id="locProg"></div>
       <p class="loc-note" id="locNote"></p>
       <div class="btn-row" id="locBtns"></div>
+    </section>
+
+    <section class="sec">
+      <h2 class="sec-h">${t('ชนิดจุด', 'Point type')}</h2>
+      <div class="seg kind-seg" role="radiogroup" aria-label="${t('ชนิดจุด', 'Point type')}" id="kindSeg"></div>
+      <p class="hint" id="kindHint"></p>
     </section>
 
     <section class="sec">
@@ -251,6 +260,25 @@ export async function render(root, ctx, id) {
       if (err.name !== 'AbortError') toast(gps.GPS_ERRORS[err.message] || t(`GPS ผิดพลาด: ${err.message}`, `GPS error: ${err.message}`), 4000);
     }
     if (!closed) renderLocation();
+  }
+
+  // ---------- point type: Station / Check point ----------
+  function paintKind() {
+    const box = q('#kindSeg');
+    if (!box) return;
+    const cur = isAutoType(st) ? 'auto' : st.kind;
+    const now = pointType(st);
+    const fill = colorFor(st);
+    const opts = [
+      ['auto', t('อัตโนมัติ', 'Auto')],
+      ['station', `${shapeSVG('square', fill, 'pt-shape sm')}Station`],
+      ['check', `${shapeSVG('circle', fill, 'pt-shape sm')}Check point`],
+    ];
+    box.innerHTML = opts.map(([v, label]) => `<button type="button" role="radio" data-kind="${v}" aria-checked="${v === cur}" class="${v === cur ? 'on' : ''}">${label}</button>`).join('');
+    q('#kindHint').textContent = cur === 'auto'
+      ? t(`อัตโนมัติ: ตอนนี้เป็น ${typeName(now)} (${now === 'station' ? 'มีค่าวัด strike/dip แล้ว' : 'ยังไม่มีค่าวัด strike/dip'}) จุดที่วัด strike/dip เป็น Station ที่เหลือเป็น Check point · บนแผนที่ Station เป็นสี่เหลี่ยม Check point เป็นวงกลม จุดแรกและจุดสุดท้ายเป็นสามเหลี่ยม`,
+        `Auto: now a ${typeName(now)} (${now === 'station' ? 'a strike/dip is recorded' : 'no strike/dip yet'}). Points with a strike/dip are stations, the rest check points. On the map stations are squares, check points circles, and the first and last points triangles.`)
+      : t(`ตั้งเองเป็น ${typeName(now)} แตะ อัตโนมัติ ให้แอปเลือกจากค่าวัด strike/dip`, `Set by hand to ${typeName(now)}. Tap Auto to let the app decide from the strike/dip.`);
   }
 
   // ---------- lithology ----------
@@ -431,6 +459,12 @@ export async function render(root, ctx, id) {
   root.addEventListener('click', async (e) => {
     const ph = e.target.closest('[data-photo-id]');
     if (ph) return openPhoto(ph.dataset.photoId);
+    const kb = e.target.closest('[data-kind]');
+    if (kb) {
+      if (kb.dataset.kind === 'auto') delete st.kind; else st.kind = kb.dataset.kind;
+      touch();
+      return;
+    }
     const chip = e.target.closest('.chip[data-lith]');
     if (chip) {
       st.lithology = chip.dataset.lith;
@@ -557,6 +591,7 @@ export async function render(root, ctx, id) {
 
   renderLocation();
   syncChips();
+  paintKind();
   renderMeasurements();
   renderSamples();
   renderPhotos();

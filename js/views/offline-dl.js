@@ -1,7 +1,9 @@
-// Download a region's offline data (street map and/or rock units) with progress in toasts.
+// Download a region's offline data (street map and/or rock units), or the ground heights (DEM) of
+// an area for cross sections, with progress in toasts.
 
 import * as offline from '../offlinemap.js';
 import * as geol from '../geology.js';
+import * as dem from '../dem.js';
 import { regionById, regionName } from '../regions.js';
 import { toast } from '../ui.js';
 import { fmtSize } from '../util.js';
@@ -39,4 +41,33 @@ export async function downloadRegion(id, { map = true, rocks = true } = {}) {
     }
   }
   return ok;
+}
+
+/**
+ * Keep the ground heights (DEM) of a lat/lon box ({ south, west, north, east }) on the phone, so
+ * cross sections there work with no internet. Resolves true when the whole box is stored.
+ */
+export async function downloadDem(box) {
+  if (!navigator.onLine) { toast(t('ต้องต่อเน็ตเพื่อดาวน์โหลด', 'Connect to the internet to download'), 3500); return false; }
+  if (dem.tileCount(box) > dem.MAX_AREA_TILES) {
+    toast(t('บริเวณกว้างเกินไป ซูมแผนที่เข้าก่อน (ไม่เกินราว 100 × 100 กม.)', 'The area is too large. Zoom the map in first (up to about 100 × 100 km)'), 4000);
+    return false;
+  }
+  let last = 0;
+  try {
+    toast(t('กำลังดาวน์โหลดความสูงพื้นดิน…', 'Downloading ground heights…'), 2000);
+    const r = await dem.downloadArea(box, (done, total, bytes) => {
+      const now = Date.now();
+      if (now - last < 900 && done < total) return;
+      last = now;
+      toast(`${t('ความสูงพื้นดิน', 'Ground heights')} ${done}/${total} (${fmtSize(bytes)})`, 1500);
+    });
+    toast(r.partial
+      ? t(`ได้ความสูงมาบางส่วน (${fmtSize(r.bytes)}) ลองอีกครั้งเมื่อเน็ตดีขึ้น`, `Got part of the heights (${fmtSize(r.bytes)}). Try again on a better connection`)
+      : t(`เก็บความสูงพื้นดินบริเวณนี้แล้ว (${fmtSize(r.bytes)}) ภาพตัดขวางใช้ได้แม้ไม่มีเน็ต`, `Ground heights for this area saved (${fmtSize(r.bytes)}). Cross sections here now work with no internet`), 4500);
+    return !r.partial;
+  } catch (err) {
+    toast(t(`ดาวน์โหลดความสูงไม่สำเร็จ: ${err.message}`, `Could not download the heights: ${err.message}`), 5000);
+    return false;
+  }
 }
