@@ -1416,3 +1416,8 @@ input[type='range'] { width: 100%; height: 32px; margin: 0; accent-color: var(--
 .map-legend .lg-kinds span { display: inline-flex; align-items: center; }
 .pp .pp-kind { font-family: var(--font); font-size: 12px; font-weight: 500; color: #666; margin-left: 4px; }
 .xs-row .xs-pt { width: 18px; height: 18px; }
+
+/* v1.5 cross section: the picture is an example, not an interpretation; the part each rock plays */
+.xs-disclaimer { display: flex; gap: 8px; align-items: flex-start; margin: 10px 0 6px; padding: 9px 11px; border: 1px solid color-mix(in srgb, var(--fair) 50%, transparent); border-radius: 10px; background: color-mix(in srgb, var(--fair) 8%, transparent); font-size: 13px; line-height: 1.5; color: var(--text-2); }
+.xs-disclaimer .i { flex: none; width: 18px; height: 18px; margin-top: 1px; color: var(--fair); }
+.xs-rock .xs-role { display: inline-block; margin-left: 6px; padding: 0 6px; border: 1px solid currentColor; border-radius: 6px; font-style: normal; font-size: 11px; font-weight: 500; line-height: 1.5; color: var(--accent); vertical-align: 1px; }

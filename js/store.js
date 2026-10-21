@@ -6,7 +6,7 @@ import { hasMeasurement, norm360 } from './geomath.js';
 import { readExif } from './exif.js';
 import { t } from './i18n.js';
 
-export const APP_VERSION = '1.4.0';
+export const APP_VERSION = '1.5.0';
 
 const DEFAULTS = {
   projectId: null,

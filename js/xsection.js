@@ -1,22 +1,38 @@
 // Cross section along the stations, in the order they were made (ST-001 → ST-002 → …), or along a
 // straight line across the mean strike with the stations projected onto it.
 //
+// It is an example to think with, not an interpretation: everything below ground is the app's
+// guess from what was recorded at the stations, and the geologist judges what is really there.
+// The screen and every exported picture say so.
+//
 // Ground line: DEM heights sampled along the line (js/dem.js), or the GPS heights of the stations
 // when no DEM can be had.
 // Rocks and dips: what was recorded at each station, unless it was changed on the cross section
 // screen. Those changes are kept with the cross section (IndexedDB "xsec-<project id>") and never
 // touch the notebook, so an odd block that is not in place (float) can be left out or corrected.
-// Below ground ("dip domain" construction):
+// Each rock plays one part in the picture, chosen on the screen or else guessed from its name:
+//   • bed ('layer')   — part of the tilted or folded sequence, worked out as below;
+//   • cover           — lies on an erosion surface over older rocks (an unconformity): young
+//                       sediment, laterite, a lava flow. Its base runs straight between the places
+//                       where it meets older rock on the ground (on with its own dip past the last
+//                       one); the older beds carry on under it;
+//   • intrusion       — an igneous body cutting up through the beds (a stock): as wide as it comes
+//                       up on the ground, its walls widening downward at a set angle.
+// Beds ("dip domain" construction, from the beds' own stations only):
 //   • each bedding attitude becomes an apparent dip along the section line:
 //       tan(apparent dip) = tan(dip) · cos(dip direction − section azimuth)
 //   • apparent dips are interpolated between stations; every bed boundary follows them, so the
 //     boundaries never cross (beds keep their vertical spacing);
 //   • a point underground takes the rock of the place where its bed comes up to the ground, the
 //     nearest such place along the section; contacts sit halfway between two stations with
-//     different rocks unless moved;
+//     different rocks unless moved — except that where the same two beds meet again at a level
+//     the first contact could also be at (the other limb of a fold), both are put at one level,
+//     so the fold's beds join up under its hinge;
 //   • beds may also come up just past either end (ground and dip carried on), taking the rock at
 //     that end; a bed that comes up nowhere takes the lowest rock seen. The dashed line is the
-//     lowest bed that comes up on the line itself.
+//     lowest bed that comes up on the line itself;
+//   • where the apparent dip turns from one side to the other the fold axis is marked: anticline
+//     (ประทุนคว่ำ) where the beds dip away from it, syncline (ประทุนหงาย) where they dip toward it.
 // Everything is computed in metres and only stretched when drawn, so the vertical exaggeration
 // steepens drawn dips exactly as tan(drawn) = V.E. · tan(apparent).
 
@@ -47,14 +63,16 @@ const snap = (v, list) => list.reduce((a, b) => (Math.abs(Math.log(b / v)) < Mat
 
 // line: 'path' — through the stations in order; 'strike' — a straight line across the strike of
 // the beds, with every station projected onto it
-export const defaultConfig = () => ({ v: 1, line: 'path', ve: 'auto', depth: 'auto', under: true, flip: false, zoom: 1, over: {}, contacts: {}, colors: {}, autoColors: {} });
+// roles: rock key → 'layer' | 'cover' | 'intrusion' chosen on the screen (else guessed from the name)
+// walls: rock key → wall angle of an intrusion in degrees from horizontal
+export const defaultConfig = () => ({ v: 1, line: 'path', ve: 'auto', depth: 'auto', under: true, flip: false, zoom: 1, over: {}, contacts: {}, colors: {}, autoColors: {}, roles: {}, walls: {} });
 const kvKey = (projectId) => `xsec-${projectId}`;
 
 export async function loadConfig(projectId) {
   let saved = null;
   try { saved = await db.get('kv', kvKey(projectId)); } catch { /* none */ }
   const c = { ...defaultConfig(), ...(saved || {}) };
-  for (const k of ['over', 'contacts', 'colors', 'autoColors']) c[k] = { ...(c[k] || {}) };
+  for (const k of ['over', 'contacts', 'colors', 'autoColors', 'roles', 'walls']) c[k] = { ...(c[k] || {}) };
   return c;
 }
 export const saveConfig = (projectId, cfg) => db.put('kv', JSON.parse(JSON.stringify(cfg)), kvKey(projectId));
@@ -84,6 +102,31 @@ export function defaultColor(key, typed, cfg, used = []) {
   cfg.autoColors[key] = color;
   return { color, changed: true };
 }
+
+// ---------- the part a rock plays in the picture ----------
+
+export const ROLES = ['layer', 'cover', 'intrusion'];
+export const WALLS = [90, 80, 70, 60];
+export const DEFAULT_WALL = 80;
+// guesses from the rock's name (English or Thai) when none is chosen on the screen
+const INTRUSIVE = /granit|diorit|gabbro|tonalit|syenit|monzonit|peridotit|dunit|pegmatit|aplit|porphyr|dolerit|diabase|intrusi|pluton|\bdyke\b|\bdike\b|แกรนิต|ไดออไรต์|แกบโบร|โทนาไลต์|ไซอีไนต์|มอนโซไนต์|เพอริโดไทต์|เพกมาไทต์|แอปไลต์|พอร์ไฟรี|โดเลอไรต์|ไดอะเบส|แทรกซอน/i;
+const COVER = /alluvi|colluvi|terrace|laterit|regolith|quaternary|unconsolidated|\bsoil\b|\bclay\b|\bsand\b|\bgravel\b|basalt|ตะกอนน้ำพา|ตะกอนตะพัก|ตะกอนร่วน|ตะกอนเชิงเขา|ตะกอนทางน้ำ|ศิลาแลง|ลูกรัง|ดินเหนียว|ชั้นดิน|ดินร่วน|ทรายร่วน|กรวดทราย|บะซอลต์/i;
+const QCODE = /^q[a-z]{0,4}$/i; // DMR map symbols of Quaternary units: Qa, Qt, Qff …
+
+/** 'intrusion' for intrusive igneous rocks, 'cover' for loose sediment, laterite and basalt, else 'layer'. */
+export function autoRole(name) {
+  const s = String(name || '').replace(/^c:/, '').trim();
+  if (!s) return 'layer';
+  if (INTRUSIVE.test(s)) return 'intrusion';
+  if (COVER.test(s) || QCODE.test(s)) return 'cover';
+  return 'layer';
+}
+export const roleOf = (key, typed, cfg) => (ROLES.includes(cfg.roles?.[key]) ? cfg.roles[key] : autoRole(typed || key));
+export const wallOf = (key, cfg) => (fin(cfg.walls?.[key]) ? clamp(cfg.walls[key], 45, 90) : DEFAULT_WALL);
+/** As in "Granite เป็น…" / "Granite is …". */
+export const roleName = (role) => (role === 'cover' ? t('ชั้นปิดทับ (บนรอยชั้นไม่ต่อเนื่อง)', 'cover (on an unconformity)')
+  : role === 'intrusion' ? t('หินอัคนีแทรกซอน', 'an intrusion') : t('ชั้นหิน', 'a bed'));
+export const roleShort = (role) => (role === 'cover' ? t('ชั้นปิดทับ', 'cover') : role === 'intrusion' ? t('แทรกซอน', 'intrusion') : t('ชั้นหิน', 'bed'));
 
 // ---------- attitudes ----------
 
@@ -305,8 +348,10 @@ export function buildModel(path, ground, cfg) {
   const N = path.samples.length;
   const sArr = Float64Array.from(path.samples, (p) => p.s);
   const topo = Float64Array.from(ground.z);
+  const L = sArr[N - 1];
   let zMin = Infinity, zMax = -Infinity;
   for (const z of topo) { if (z < zMin) zMin = z; if (z > zMax) zMax = z; }
+  const zAt = (s) => lerpAt(sArr, topo, s);
 
   // first and last points of the whole walk (all located stations, on the line or not)
   const ends = walkEnds(path.located || path.pts.map((p) => p.st));
@@ -314,15 +359,35 @@ export function buildModel(path, ground, cfg) {
     const e = effective(p.st, cfg);
     const app = e.plane && !e.skip ? apparentDip(e.plane, p.az) : null;
     return {
-      ...p, ...e, app, faultApps: e.skip ? [] : e.faults.map((f) => ({ ...f, app: apparentDip(f, p.az) })), z: lerpAt(sArr, topo, p.s),
+      ...p, ...e, app, faultApps: e.skip ? [] : e.faults.map((f) => ({ ...f, app: apparentDip(f, p.az) })), z: zAt(p.s),
       type: pointType(p.st), shape: shapeOf(p.st, ends),
     };
   });
 
-  // apparent dip along the section, interpolated between stations (same spot → averaged)
+  // the rocks on the line and the part each plays: bed, cover or intrusion
+  const rocks = [];
+  const byKey = new Map();
+  let cfgChanged = false;
+  const rockIndex = (typed) => {
+    const key = rockGroup(typed);
+    if (byKey.has(key)) { rocks[byKey.get(key)].n++; return byKey.get(key); }
+    const idx = rocks.length;
+    byKey.set(key, idx);
+    rocks.push({ idx, key, ...rockLabel(key, typed), n: 1, role: roleOf(key, typed, cfg), autoRole: !ROLES.includes(cfg.roles?.[key]), wall: wallOf(key, cfg) });
+    return idx;
+  };
+  const data = pts.filter((p) => !p.skip && p.rock);
+  for (const p of data) p.rockIdx = rockIndex(p.rock);
+  // a line of nothing but cover has nothing for it to cover: it is drawn as beds
+  if (data.length && data.every((p) => rocks[p.rockIdx].role === 'cover')) {
+    for (const r of rocks) { r.role = 'layer'; r.coverAsBeds = true; }
+  }
+  const isBedPt = (p) => p.rockIdx == null || rocks[p.rockIdx].role === 'layer';
+
+  // apparent dip along the section from the beds' stations, interpolated between them (same spot → averaged)
   const dipS = [], dipA = [];
   for (const p of pts) {
-    if (p.app == null) continue;
+    if (p.app == null || !isBedPt(p)) continue;
     if (dipS.length && Math.abs(dipS[dipS.length - 1] - p.s) < 0.01) {
       const k = dipS.length - 1;
       dipA[k] = (dipA[k] + p.app) / 2;
@@ -337,65 +402,107 @@ export function buildModel(path, ground, cfg) {
     S[j] = S[j - 1] + 0.5 * (gPrev + g) * (sArr[j] - sArr[j - 1]);
     gPrev = g;
   }
+  // stratigraphic height of the ground, U = z − S
+  const U = new Float64Array(N);
+  for (let j = 0; j < N; j++) U[j] = topo[j] - S[j];
 
-  // rocks along the ground: stations in order, contacts between different rocks
-  const rocks = [];
-  const byKey = new Map();
-  let cfgChanged = false;
-  const rockIndex = (typed) => {
-    const key = rockGroup(typed);
-    if (byKey.has(key)) { rocks[byKey.get(key)].n++; return byKey.get(key); }
-    const idx = rocks.length;
-    byKey.set(key, idx);
-    rocks.push({ idx, key, ...rockLabel(key, typed), n: 1 });
-    return idx;
-  };
-  const data = pts.filter((p) => !p.skip && p.rock);
-  const bounds = [], seq = [], contacts = [];
+  // contacts along the ground: halfway between two stations with different rocks unless moved,
+  // the two limbs of a fold put at one level
+  const contacts = [];
   data.forEach((p, k) => {
-    p.rockIdx = rockIndex(p.rock);
-    if (!k) { seq.push(p.rockIdx); return; }
-    if (p.rockIdx === seq[seq.length - 1]) return;
     const a = data[k - 1];
+    if (!a || a.rockIdx === p.rockIdx) return;
     const lowFirst = (a.st.number || 0) <= (p.st.number || 0);
     const key = lowFirst ? `${a.st.id}|${p.st.id}` : `${p.st.id}|${a.st.id}`;
-    const f0 = fin(cfg.contacts[key]) ? clamp(cfg.contacts[key], 0, 1) : 0.5;
+    const set = fin(cfg.contacts[key]);
+    const f0 = set ? clamp(cfg.contacts[key], 0, 1) : 0.5;
     const f = lowFirst ? f0 : 1 - f0;
-    const s = a.s + f * (p.s - a.s);
-    bounds.push(s);
-    seq.push(p.rockIdx);
-    contacts.push({ a, b: p, s, f, key, lowFirst });
+    contacts.push({ a, b: p, s: a.s + f * (p.s - a.s), f, key, lowFirst, set });
   });
-  if (!seq.length) seq.push(-1);
+  matchContacts(contacts, rocks, sArr, U);
+  const bounds = contacts.map((c) => c.s);
+  const seq = data.length ? [data[0].rockIdx, ...contacts.map((c) => c.b.rockIdx)] : [-1];
   const rockAt = (s) => {
     let lo = 0, hi = bounds.length;
     while (lo < hi) { const m = (lo + hi) >> 1; if (bounds[m] <= s) lo = m + 1; else hi = m; }
     return seq[lo];
   };
+  // the beds where they come up (cover and intrusions hide them); with no rocks at all, everywhere
+  const bedAt = (s) => { const r = rockAt(s); return r >= 0 && rocks[r].role === 'layer' ? r : -1; };
+  const seen = data.length ? (s) => bedAt(s) >= 0 : () => true;
 
-  // stratigraphic height of the ground, U = z − S; and where each level comes up to the ground
-  const U = new Float64Array(N);
-  let Umin = Infinity, Umax = -Infinity, jMin = 0;
+  let Umin = Infinity, Umax = -Infinity, jMin = -1, jMax = -1;
   for (let j = 0; j < N; j++) {
-    U[j] = topo[j] - S[j];
+    if (!seen(sArr[j])) continue;
     if (U[j] < Umin) { Umin = U[j]; jMin = j; }
-    if (U[j] > Umax) Umax = U[j];
+    if (U[j] > Umax) { Umax = U[j]; jMax = j; }
   }
-  const deepRock = rockAt(sArr[jMin]);
-  const bins = buildBins(sArr, U, Umin, Umax, rockAt);
+  const hasBeds = jMin >= 0;
+  if (!hasBeds) for (let j = 0; j < N; j++) { Umin = Math.min(Umin, U[j]); Umax = Math.max(Umax, U[j]); }
+  const deepRock = hasBeds ? bedAt(sArr[jMin]) : -1;
+  const topRock = hasBeds ? bedAt(sArr[jMax]) : -1;
+  const bins = buildBins(sArr, U, Umin, Umax, rockAt, seen);
   // deepest point of the lowest bed boundary that comes up to the ground (the dashed line)
   let lowBed = Infinity;
-  for (let j = 0; j < N; j++) lowBed = Math.min(lowBed, Umin + S[j]);
+  if (hasBeds) for (let j = 0; j < N; j++) lowBed = Math.min(lowBed, Umin + S[j]);
   // past each end, the ground and the dip are taken to carry on as they are near that end; where
   // the level U falls going outward, deeper beds come up beyond the end (rate in m of U per m)
-  const L = sArr[N - 1];
   const w = Math.min(clamp(0.05 * L, 50, 500), L / 2);
   const ends2 = [
-    { s: 0, U: U[0], rock: rockAt(0), rate: (lerpAt(sArr, U, w) - U[0]) / w },
-    { s: L, U: U[N - 1], rock: rockAt(L), rate: (lerpAt(sArr, U, L - w) - U[N - 1]) / w },
+    { s: 0, U: U[0], rock: bedAt(0), rate: (lerpAt(sArr, U, w) - U[0]) / w },
+    { s: L, U: U[N - 1], rock: bedAt(L), rate: (lerpAt(sArr, U, L - w) - U[N - 1]) / w },
   ].filter((e) => e.rock >= 0);
 
-  // colours and top-to-bottom order of the rocks
+  // stretches of ground where cover or an intrusion comes up, between its contacts (or an end)
+  const runs = [];
+  seq.forEach((r, i) => {
+    if (r < 0 || rocks[r].role === 'layer') return;
+    const a = i ? bounds[i - 1] : 0, b = i < bounds.length ? bounds[i] : L;
+    const last = runs[runs.length - 1];
+    if (last && last.role === rocks[r].role && Math.abs(last.b - a) < 1e-6) { last.b = b; last.hasB = i < bounds.length; last.rocks.push(r); return; }
+    runs.push({ role: rocks[r].role, rocks: [r], a, b, hasA: i > 0, hasB: i < bounds.length });
+  });
+  const covers = [], bodies = [];
+  for (const run of runs) {
+    const { a, b, hasA, hasB } = run;
+    const rockOf = run.rocks.length === 1 ? () => run.rocks[0] : (s) => { const r = rockAt(clamp(s, a, b)); return r >= 0 ? r : run.rocks[0]; };
+    const za = zAt(a), zb = zAt(b);
+    if (run.role === 'cover') {
+      // base: straight between the two contacts; past the last one on with the cover's own dip.
+      // Where that would leave the cover thinner than a nominal few to 30 m (in a valley, or where
+      // the base would come out above the ground), it is that thick, thinning to nothing at a contact.
+      const own = pts.filter((p) => p.app != null && run.rocks.includes(p.rockIdx));
+      const g = own.length ? -Math.tan(rad(own.reduce((sum, p) => sum + p.app, 0) / own.length)) : 0;
+      const line = hasA && hasB ? (s) => za + ((zb - za) * (s - a)) / Math.max(1e-6, b - a)
+        : hasA ? (s) => za + g * (s - a) : (s) => zb + g * (s - b);
+      const thick = clamp(0.04 * (b - a), 3, 30);
+      const taper = Math.max(4 * thick, 0.2 * (b - a));
+      const edge = (s) => Math.min(hasA ? s - a : Infinity, hasB ? b - s : Infinity);
+      const baseAt = (s) => Math.min(line(s), zAt(s) - thick * clamp(edge(s) / taper, 0, 1));
+      covers.push({ a, b, hasA, hasB, rocks: run.rocks, rockOf, baseAt });
+    } else {
+      // walls from the contacts on the ground, widening downward
+      const wall = Math.max(...run.rocks.map((r) => rocks[r].wall));
+      const spread = 1 / Math.tan(rad(wall)); // metres outward per metre down
+      const left = (z) => (hasA ? a - spread * Math.max(0, za - z) : -Infinity);
+      const right = (z) => (hasB ? b + spread * Math.max(0, zb - z) : Infinity);
+      bodies.push({ a, b, za, zb, hasA, hasB, wall, rocks: run.rocks, rockOf, left, right, inside: (s, z) => s >= left(z) && s <= right(z) });
+    }
+  }
+
+  // fold axes: where the beds' apparent dip turns from one side to the other
+  const hinges = [];
+  const turn = dipS.map((s, i) => ({ s, a: dipA[i] })).filter((d) => Math.abs(d.a) >= 1);
+  for (let i = 1; i < turn.length; i++) {
+    const d0 = turn[i - 1], d1 = turn[i];
+    if (Math.sign(d0.a) === Math.sign(d1.a) || Math.max(Math.abs(d0.a), Math.abs(d1.a)) < 3) continue;
+    let lo = d0.s, hi = d1.s;
+    for (let it = 0; it < 40; it++) { const mid = (lo + hi) / 2; if (Math.sign(aAt(mid)) === Math.sign(d0.a)) lo = mid; else hi = mid; }
+    // dipping toward A on the left and toward A′ on the right: away from the axis → anticline
+    hinges.push({ s: (lo + hi) / 2, type: d0.a < 0 ? 'anticline' : 'syncline' });
+  }
+
+  // colours and top-to-bottom order of the rocks: cover first, the beds as worked out, intrusions last
   const used = [];
   for (const r of rocks) {
     const typed = data.find((p) => p.rockIdx === r.idx)?.rock || r.name;
@@ -408,21 +515,88 @@ export function buildModel(path, ground, cfg) {
   const sumU = new Float64Array(rocks.length), nU = new Float64Array(rocks.length);
   for (let j = 0; j < N; j++) { const r = rockAt(sArr[j]); if (r >= 0) { sumU[r] += U[j]; nU[r]++; } }
   rocks.forEach((r) => { r.level = nU[r.idx] ? sumU[r.idx] / nU[r.idx] : -Infinity; });
-  const order = [...rocks].sort((a, b) => b.level - a.level);
+  const rank = { cover: 0, layer: 1, intrusion: 2 };
+  const order = [...rocks].sort((a, b) => rank[a.role] - rank[b.role] || b.level - a.level);
 
   const sorted = dipS.length ? [...dipA].map(Math.abs).sort((a, b) => a - b) : [];
   return {
-    L: path.L, pts, sArr, topo, S, U, zMin, zMax, Umin, Umax, deepRock, bins, rocks, order, contacts,
-    rockAt, aAt, bends: path.bends, ground: ground.src, hasDips: dipS.length > 0,
+    L: path.L, pts, sArr, topo, S, U, zMin, zMax, Umin, Umax, deepRock, topRock, bins, rocks, order, contacts,
+    rockAt, bedAt, aAt, bends: path.bends, ground: ground.src, hasDips: dipS.length > 0, hasBeds,
     medianDip: sorted.length ? sorted[Math.floor(sorted.length / 2)] : 0,
     azStart: path.azStart, azEnd: path.azEnd, overall: path.overall, cfgChanged,
-    line: path.line || 'path', how: path.how, ends: path.ends, lowBed, ends2,
+    line: path.line || 'path', how: path.how, ends: path.ends, lowBed, ends2, covers, bodies, hinges,
     offCodes: (path.off || []).map((s) => s.code),
   };
 }
 
-/** For every level of U, the places along the section where it meets the ground (sorted). */
-function buildBins(sArr, U, Umin, Umax, rockAt) {
+/**
+ * The other limb of a fold: where the same two beds meet again at a level the first contact could
+ * also be at (somewhere between its two stations), both are taken to be one boundary and put at
+ * one level, so the beds join up under the hinge instead of stepping. A contact moved by hand
+ * stays where it is and the others follow it. Contacts of beds that cannot share one level (no
+ * level fits between all their stations) are left halfway.
+ */
+function matchContacts(contacts, rocks, sArr, U) {
+  const uAt = (s) => lerpAt(sArr, U, s);
+  const beds = contacts.filter((c) => rocks[c.a.rockIdx].role === 'layer' && rocks[c.b.rockIdx].role === 'layer' && c.b.s - c.a.s > 1e-6);
+  for (const c of beds) {
+    const ua = uAt(c.a.s), ub = uAt(c.b.s);
+    c.lo = Math.min(ua, ub);
+    c.hi = Math.max(ua, ub);
+    c.level = uAt(c.s);
+    c.pair = [c.a.rockIdx, c.b.rockIdx].sort((x, y) => x - y).join('|');
+  }
+  const parent = beds.map((_, i) => i);
+  const find = (i) => (parent[i] === i ? i : (parent[i] = find(parent[i])));
+  for (let i = 0; i < beds.length; i++) {
+    for (let j = i + 1; j < beds.length; j++) {
+      const p = beds[i], q = beds[j];
+      if (p.pair !== q.pair) continue;
+      const overlap = Math.min(p.hi, q.hi) - Math.max(p.lo, q.lo);
+      if (overlap > Math.max(0.5, 0.02 * Math.min(p.hi - p.lo, q.hi - q.lo))) parent[find(i)] = find(j);
+    }
+  }
+  const groups = new Map();
+  beds.forEach((c, i) => { const r = find(i); if (!groups.has(r)) groups.set(r, []); groups.get(r).push(c); });
+  for (const g of groups.values()) {
+    if (g.length < 2) continue;
+    const lo = Math.max(...g.map((c) => c.lo)), hi = Math.min(...g.map((c) => c.hi));
+    if (!(hi > lo)) continue;
+    const fixed = g.filter((c) => c.set);
+    const from = fixed.length ? fixed : g;
+    const level = clamp(from.reduce((sum, c) => sum + c.level, 0) / from.length, lo, hi);
+    for (const c of g) {
+      if (c.set) continue;
+      const s = crossingNear(sArr, U, c.a.s, c.b.s, level, c.s);
+      if (s == null) continue;
+      c.s = s;
+      c.f = (s - c.a.s) / (c.b.s - c.a.s);
+      c.matched = true;
+    }
+  }
+}
+
+/** Where U crosses `level` between s0 and s1, the crossing nearest `near`; or null. */
+function crossingNear(sArr, U, s0, s1, level, near) {
+  let best = null, bd = Infinity;
+  let ps = s0, pu = lerpAt(sArr, U, s0);
+  const visit = (s, u) => {
+    if ((pu - level) * (u - level) <= 0) {
+      const x = u === pu ? ps : ps + ((level - pu) / (u - pu)) * (s - ps);
+      if (Math.abs(x - near) < bd) { bd = Math.abs(x - near); best = x; }
+    }
+    ps = s; pu = u;
+  };
+  for (let j = 0; j < sArr.length && sArr[j] < s1; j++) if (sArr[j] > s0) visit(sArr[j], U[j]);
+  visit(s1, lerpAt(sArr, U, s1));
+  return best;
+}
+
+/**
+ * For every level of U, the places along the section where it meets the ground (sorted), where
+ * `seen(s)` says the beds are seen there (not under cover or an intrusion).
+ */
+function buildBins(sArr, U, Umin, Umax, rockAt, seen) {
   const N = U.length;
   const span = Umax - Umin;
   const nb = span > 1e-6 ? clamp(Math.ceil(span / 0.05), 64, 4096) : 1;
@@ -437,7 +611,8 @@ function buildBins(sArr, U, Umin, Umax, rockAt) {
       for (let b = b0; b <= b1; b++) {
         const ub = Umin + (b + 0.5) * du;
         const f = u1 === u0 ? 0 : (ub - u0) / (u1 - u0);
-        fn(b, sArr[j] + f * (sArr[j + 1] - sArr[j]));
+        const s = sArr[j] + f * (sArr[j + 1] - sArr[j]);
+        if (seen(s)) fn(b, s);
       }
     }
   };
@@ -448,7 +623,11 @@ function buildBins(sArr, U, Umin, Umax, rockAt) {
   const rk = new Int16Array(off[nb]);
   const fill = new Int32Array(nb);
   each((b, s) => { const i = off[b] + fill[b]++; ps[i] = s; rk[i] = rockAt(s); });
-  return { Umin, nb, du, off, ps, rk };
+  // levels hidden under cover or an intrusion meet the ground nowhere seen: the nearest level that does
+  const below = new Int32Array(nb), above = new Int32Array(nb);
+  for (let b = 0, last = -1; b < nb; b++) { if (cnt[b]) last = b; below[b] = last; }
+  for (let b = nb - 1, last = -1; b >= 0; b--) { if (cnt[b]) last = b; above[b] = last; }
+  return { Umin, Umax, nb, du, off, ps, rk, below, above };
 }
 
 /** Index (into bins.ps / bins.rk) of the place in level bin b nearest to s, or -1. */
@@ -462,11 +641,12 @@ function nearestIn(bins, b, s) {
 }
 
 /**
- * Rock index underground at distance s and bed level u (= z − S(s)): the rock where this bed
+ * Rock index of the beds at distance s and bed level u (= z − S(s)): the rock where this bed
  * comes up to the ground nearest along the section. A bed may also come up just beyond either
  * end of the section (the ground and the dip carried on past the end, see buildModel's ends):
  * it then takes the rock at that end, so the rock seen at the first and last stations goes on
- * down past them instead of vanishing. A bed that comes up nowhere takes the lowest rock seen.
+ * down past them instead of vanishing. A bed that comes up nowhere takes the lowest rock seen
+ * (or, above every bed seen — under cover — the highest).
  */
 function rockUnder(m, s, u) {
   const bins = m.bins;
@@ -481,6 +661,13 @@ function rockUnder(m, s, u) {
       }
       if (best !== -2) break;
     }
+    if (best === -2 && u <= bins.Umax) {
+      // a level hidden under cover or an intrusion: the rock of the nearest level seen
+      const lo = bins.below[b], hi = bins.above[b];
+      const bb = lo < 0 ? hi : hi < 0 ? lo : b - lo <= hi - b ? lo : hi;
+      const i = bb >= 0 ? nearestIn(bins, bb, s) : -1;
+      if (i >= 0) { bestD = Math.abs(bins.ps[i] - s); best = bins.rk[i]; }
+    }
   }
   for (const e of m.ends2) {
     const depth = e.U - u;
@@ -488,7 +675,24 @@ function rockUnder(m, s, u) {
     const d = Math.abs(s - e.s) + depth / e.rate;
     if (d < bestD) { bestD = d; best = e.rock; }
   }
-  return best !== -2 ? best : m.deepRock;
+  if (best !== -2) return best;
+  return u > bins.Umax && m.topRock >= 0 ? m.topRock : m.deepRock;
+}
+
+const COVER_BIT = 8192; // marks cover in the pixel labels, so its base gets the unconformity line instead
+
+/** Rock at distance s and height z: cover above its base, then an intrusion, then the beds. */
+function rock2D(m, s, z, Sg) {
+  for (const c of m.covers) if (s >= c.a && s <= c.b && z > c.baseAt(s)) return c.rockOf(s) + COVER_BIT;
+  for (const b of m.bodies) if (b.inside(s, z)) return b.rockOf(s);
+  return rockUnder(m, s, z - Sg);
+}
+
+/** True where the beds are drawn (not cover, not inside an intrusion). */
+function inBeds(m, s, z) {
+  for (const c of m.covers) if (s >= c.a && s <= c.b && z > c.baseAt(s)) return false;
+  for (const b of m.bodies) if (b.inside(s, z)) return false;
+  return true;
 }
 
 // ---------- scales ----------
@@ -569,7 +773,7 @@ function rasterRocks(m, box, rr, under) {
       const z = box.zTop - (k + 0.5) * zPerPx;
       if (z > zg) continue;
       let r;
-      if (under) r = rockUnder(m, s, z - Sg);
+      if (under) r = rock2D(m, s, z, Sg);
       else r = (zg - z) / zPerPx <= band ? surf : -2;
       lab[k * PW + i] = r;
     }
@@ -579,11 +783,14 @@ function rasterRocks(m, box, rr, under) {
   for (let p = 0, q = 0; p < lab.length; p++, q += 4) {
     const r = lab[p];
     if (r <= -2) continue;
-    const c3 = r >= 0 ? cols[r] : unk;
+    const rk = r >= COVER_BIT ? r - COVER_BIT : r;
+    const c3 = rk >= 0 ? cols[rk] : unk;
     px[q] = c3[0]; px[q + 1] = c3[1]; px[q + 2] = c3[2]; px[q + 3] = 255;
   }
-  // contact lines where neighbouring pixels hold different rocks
+  // contact lines where neighbouring pixels hold different rocks (not along the base of cover:
+  // that gets the unconformity's wavy line)
   const th = Math.max(1, Math.round(rr * 0.9));
+  const edge = (o, r) => o >= -1 && o !== r && (o >= COVER_BIT) === (r >= COVER_BIT);
   for (let k = 0; k < PH; k++) {
     for (let i = 0; i < PW; i++) {
       const p = k * PW + i;
@@ -591,7 +798,7 @@ function rasterRocks(m, box, rr, under) {
       if (r < -1) continue;
       const right = i + 1 < PW ? lab[p + 1] : r;
       const down = k + 1 < PH ? lab[p + PW] : r;
-      if ((right >= -1 && right !== r) || (down >= -1 && down !== r)) {
+      if (edge(right, r) || edge(down, r)) {
         for (let a = 0; a < th; a++) for (let b = 0; b < th; b++) {
           const ii = i + b, kk = k + a;
           if (ii >= PW || kk >= PH || lab[kk * PW + ii] < -1) continue;
@@ -636,7 +843,7 @@ export async function renderSection(canvas, m, o) {
   const plotH = Math.max(40, (zTop - zBot) * vs);
 
   // page layout
-  const headH = exp ? 178 : 0;
+  const headH = exp ? 210 : 0;
   const roomTop = exp ? 74 : 54;   // station labels above the highest ground
   const axisB = exp ? 54 : 30;
   const Y0 = headH + roomTop;
@@ -670,7 +877,8 @@ export async function renderSection(canvas, m, o) {
   ctx.rect(padL, Y0, plotW, plotH);
   ctx.clip();
   // lowest bed that reaches the ground: below it the deepest rock is carried down
-  if (o.under !== false && m.bins.nb > 1) {
+  const under = o.under !== false;
+  if (under && m.hasBeds && m.bins.nb > 1) {
     ctx.setLineDash([6 * k, 4 * k]);
     ctx.strokeStyle = 'rgba(29,35,41,0.75)';
     ctx.lineWidth = 1.3 * k;
@@ -678,12 +886,59 @@ export async function renderSection(canvas, m, o) {
     let pen = false;
     for (let j = 0; j < m.sArr.length; j++) {
       const z = m.Umin + m.S[j];
-      if (z < m.topo[j] - 0.3 && z > zBot) {
+      if (z < m.topo[j] - 0.3 && z > zBot && inBeds(m, m.sArr[j], z)) {
         if (pen) ctx.lineTo(X(m.sArr[j]), Y(z)); else ctx.moveTo(X(m.sArr[j]), Y(z));
         pen = true;
       } else pen = false;
     }
     ctx.stroke();
+  }
+  if (under) {
+    // fold axes: a dash-dot line down from the ground through the beds, named partway down
+    for (const h of m.hinges) {
+      const x = X(h.s), zg = lerpAt(m.sArr, m.topo, h.s);
+      const dz = (zg - zBot) / 120;
+      ctx.save();
+      ctx.setLineDash([9 * k, 4 * k, 2 * k, 4 * k]);
+      ctx.lineCap = 'round';
+      for (const [color, lw] of [['rgba(255,255,255,0.85)', 3.6 * k], [INK, 1.5 * k]]) {
+        ctx.strokeStyle = color;
+        ctx.lineWidth = lw;
+        ctx.beginPath();
+        let pen = false;
+        for (let z = zg - 0.5; z >= zBot; z -= dz) {
+          if (inBeds(m, h.s, z)) { if (pen) ctx.lineTo(x, Y(z)); else ctx.moveTo(x, Y(z)); pen = true; } else pen = false;
+        }
+        ctx.stroke();
+      }
+      ctx.restore();
+      const yl = Y(zg) + 0.32 * (Y0 + plotH - Y(zg));
+      ctx.font = `600 ${10.5 * k}px ${SANS}`;
+      ctx.fillStyle = INK;
+      ctx.textAlign = x > padL + plotW - 60 * k ? 'right' : x < padL + 60 * k ? 'left' : 'center';
+      halo(ctx, h.type === 'anticline' ? t('แกนประทุนคว่ำ', 'Anticline') : t('แกนประทุนหงาย', 'Syncline'), x, yl, 3.4);
+    }
+    // unconformity: a wavy line along the base of each stretch of cover
+    for (const c of m.covers) {
+      const x0 = Math.max(padL, X(c.a)), x1 = Math.min(padL + plotW, X(c.b));
+      if (x1 - x0 < 1) continue;
+      const amp = 1.9 * k, wl = 11 * k;
+      ctx.save();
+      ctx.setLineDash([]);
+      ctx.lineJoin = 'round';
+      for (const [color, lw] of [['rgba(255,255,255,0.8)', 1.6 * k + 2.4], [INK, 1.6 * k]]) {
+        ctx.strokeStyle = color;
+        ctx.lineWidth = lw;
+        ctx.beginPath();
+        for (let x = x0; x <= x1 + 0.01; x += 1.5) {
+          const xx = Math.min(x, x1);
+          const y = Y(c.baseAt((xx - padL) / hs)) + amp * Math.sin((2 * Math.PI * (xx - padL)) / wl);
+          if (x === x0) ctx.moveTo(xx, y); else ctx.lineTo(xx, y);
+        }
+        ctx.stroke();
+      }
+      ctx.restore();
+    }
   }
   // where the path turns sharply
   ctx.setLineDash([2 * k, 3 * k]);
@@ -886,9 +1141,28 @@ function symbolRows(m, under) {
       t('ขีดมุมเอียง: มุมเอียงปรากฏตามแนวตัด (ตัวเลขคือมุมเอียงจริงที่วัด)', 'Dip tick: apparent dip along the section (number = measured true dip)')
         + (faults ? t(' · สีแดงประ: รอยเลื่อน', ' · red dashed: fault') : '')]);
   }
-  if (under && m.bins.nb > 1) {
+  if (under && m.hasBeds && m.bins.nb > 1) {
     rows.push([(ctx, x0, y0) => { ctx.strokeStyle = INK; ctx.lineWidth = 1.6; ctx.setLineDash([7, 5]); ctx.beginPath(); ctx.moveTo(x0 + 2, y0); ctx.lineTo(x0 + 34, y0); ctx.stroke(); ctx.setLineDash([]); },
       t('ต่ำกว่าเส้นประ: ชั้นที่ไม่โผล่ให้เห็นในแนวนี้ ต่อจากหินที่ปลายแนวหรือหินชั้นล่างสุดที่พบ', 'Below the dashed line: beds that do not come up on this line, carried on from the rock at an end or the lowest rock seen')]);
+  }
+  if (under && m.hinges.length) {
+    rows.push([(ctx, x0, y0) => { ctx.strokeStyle = INK; ctx.lineWidth = 1.8; ctx.lineCap = 'round'; ctx.setLineDash([9, 4, 2, 4]); ctx.beginPath(); ctx.moveTo(x0 + 18, y0 - 11); ctx.lineTo(x0 + 18, y0 + 11); ctx.stroke(); ctx.setLineDash([]); },
+      t('เส้นประจุดแนวตั้ง: แกนชั้นหินคดโค้ง ประทุนคว่ำ (anticline) ชั้นเอียงออกจากแกน · ประทุนหงาย (syncline) ชั้นเอียงเข้าหาแกน', 'Dash-dot line: fold axis — anticline where the beds dip away from it, syncline where they dip toward it')]);
+  }
+  if (under && m.covers.length) {
+    rows.push([(ctx, x0, y0) => {
+      ctx.strokeStyle = INK; ctx.lineWidth = 2; ctx.beginPath();
+      for (let x = 0; x <= 32; x += 1) { const y = y0 + 2.6 * Math.sin((2 * Math.PI * x) / 15); if (x) ctx.lineTo(x0 + 2 + x, y); else ctx.moveTo(x0 + 2, y); }
+      ctx.stroke();
+    }, t('เส้นหยัก: รอยชั้นไม่ต่อเนื่อง ฐานของชั้นปิดทับ ลากตรงระหว่างจุดที่ชั้นปิดทับสัมผัสหินที่แก่กว่า', 'Wavy line: unconformity, the base of the cover, drawn straight between where it meets older rock')]);
+  }
+  if (under && m.bodies.length) {
+    const walls = [...new Set(m.bodies.map((b) => b.wall))].sort((a, b) => b - a).map((w) => `${w}°`).join(', ');
+    const color = m.rocks[m.bodies[0].rocks[0]].color;
+    rows.push([(ctx, x0, y0) => {
+      ctx.beginPath(); ctx.moveTo(x0 + 11, y0 - 9); ctx.lineTo(x0 + 25, y0 - 9); ctx.lineTo(x0 + 31, y0 + 10); ctx.lineTo(x0 + 5, y0 + 10); ctx.closePath();
+      ctx.fillStyle = color; ctx.fill(); ctx.strokeStyle = INK; ctx.lineWidth = 1.4; ctx.stroke();
+    }, t(`หินอัคนีแทรกซอน: ก้อนที่ผุดตัดผ่านชั้นหิน กว้างเท่าที่โผล่บนผิวดิน ผนังเอียง ${walls} จากแนวราบ ขยายออกเมื่อลึกลง`, `Intrusion: a body cutting up through the beds, as wide as it comes up, walls at ${walls} from horizontal widening downward`)]);
   }
   const hollow = m.pts.some((p) => p.skip);
   if (m.bends.length) {
@@ -901,6 +1175,12 @@ function symbolRows(m, under) {
   }
   return rows;
 }
+
+/** Said on the screen and on every exported picture. */
+export const DISCLAIMER = () => t(
+  'ภาพนี้เป็นเพียงตัวอย่างที่แอปคาดคะเนจากชนิดหินและมุมเอียงที่บันทึกในสนาม เพื่อช่วยให้เห็นภาพ ไม่ใช่ผลเจาะสำรวจหรือการตีความ นักธรณีวิทยาต้องพิจารณาความจริงเอง',
+  'This picture is only an example the app works out from the rocks and dips recorded in the field, to help picture it. It is not drilling and not an interpretation: the geologist must judge what is really there.',
+);
 
 /** What was changed from the notebook for this picture, station by station. */
 function editNotes(m) {
@@ -925,7 +1205,7 @@ function editNotes(m) {
 function notesText(m, o, ve) {
   const edits = editNotes(m);
   return [
-    t('ส่วนใต้ดินคาดคะเนจากชนิดหินและมุมเอียงที่บันทึกในสนาม ไม่ใช่ผลเจาะสำรวจ', 'Below ground is inferred from the rocks and dips recorded in the field, not from drilling.'),
+    DISCLAIMER(),
     ve > 1 ? t(`แกนตั้งขยาย ×${+ve.toFixed(1)} มุมเอียงบนภาพจึงชันกว่าจริง`, `Vertical scale ×${+ve.toFixed(1)}: dips look steeper than they are.`) : '',
     edits.length ? `${t('แก้จากสมุดบันทึกเฉพาะในภาพนี้', 'Changed from the notebook for this picture only')}: ${edits.join(' · ')}` : '',
     m.ground === 'dem' ? `${t('ความสูงพื้นดิน', 'Ground')}: ${o.demCredit || ''}`
@@ -968,6 +1248,10 @@ function drawFigureExtras(ctx, m, o, g) {
   const lines1 = wrap(ctx, sub1, titleW, 2);
   lines1.forEach((line, i) => ctx.fillText(line, padL, 98 + i * 26));
   ctx.fillText(sub2, padL, 98 + lines1.length * 26);
+  // the picture is an example, not an interpretation: said right under the title
+  ctx.font = `600 18px ${SANS}`;
+  ctx.fillStyle = '#9a5800';
+  ctx.fillText(wrap(ctx, t('ภาพตัวอย่างที่แอปคาดคะเนจากข้อมูลสนาม · นักธรณีวิทยาต้องพิจารณาและตีความเอง', 'An example worked out by the app from the field data · the geologist must judge and interpret'), titleW, 1)[0], padL, 102 + (lines1.length + 1) * 26);
 
   // plan of the line (north up)
   const bw = 300, bh = 150, bx = W - 48 - bw, by = 22;
@@ -1046,7 +1330,7 @@ function drawFigureExtras(ctx, m, o, g) {
     ctx.lineWidth = 1;
     ctx.strokeRect(cx2 + 0.5, cy2 + 6.5, 33, 21);
     ctx.fillStyle = INK;
-    const label = r.th ? `${r.name} ${r.th}` : r.name;
+    const label = `${r.th ? `${r.name} ${r.th}` : r.name}${r.role !== 'layer' ? ` · ${roleShort(r.role)}` : ''}`;
     ctx.fillText(wrap(ctx, label, colW - 50, 1)[0], cx2 + 44, cy2 + 23);
   });
   if (!m.order.length) { ctx.fillStyle = MUTED; ctx.fillText(t('ยังไม่มีชนิดหินที่บันทึกไว้', 'No rock types recorded yet'), padL, y + 23); }

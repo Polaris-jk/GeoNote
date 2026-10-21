@@ -1,6 +1,8 @@
 // Cross section along the stations in order — preview, scales, and a per-station editor.
-// Changes made here (rock, colour, dip, leaving a station out, where a contact sits) are kept with
-// the cross section only; the notebook is never changed from this screen.
+// Changes made here (rock, colour, dip, leaving a station out, where a contact sits, the part a
+// rock plays: bed, cover on an unconformity, intrusion) are kept with the cross section only; the
+// notebook is never changed from this screen. The picture is an example worked out by the app,
+// and the screen says so under it.
 
 import * as store from '../store.js';
 import * as dem from '../dem.js';
@@ -64,6 +66,7 @@ export async function render(root, ctx) {
   const firstCode = located[0].code, lastCode = located[located.length - 1].code;
   root.innerHTML = `<div class="screen xsec-screen">
     <div class="xs-box" id="xsBox"><div class="xs-scroll" id="xsScroll"><canvas id="xsCanvas" aria-label="${t('ภาพตัดขวาง แตะสัญลักษณ์ของจุดเพื่อแก้', 'Cross section. Tap a point symbol to edit it')}"></canvas></div></div>
+    <p class="xs-disclaimer">${icon('info')}<span>${xs.DISCLAIMER()}</span></p>
     <p class="xs-status" id="xsStatus"></p>
     <div class="xs-notes" id="xsNotes"></div>
     <div class="field"><span class="lbl">${t('แนวตัด', 'Section line')}</span>${seg('line', cfg.line === 'strike' ? 'strike' : 'path', [['path', t('ตามทางเดิน', 'Along the walk')], ['strike', t('ตรง ตั้งฉากแนวระดับ', 'Straight, across strike')]])}
@@ -78,7 +81,7 @@ export async function render(root, ctx) {
     <div class="field"><span class="lbl">${t('ขนาดภาพบนจอ', 'Size on screen')}</span>${seg('zoom', cfg.zoom || 1, [['1', t('พอดีจอ', 'Fit')], ['2', '×2'], ['3', '×3']])}</div>
 
     <section class="xs-sec">
-      <h2 class="sec-h">${t('หิน', 'Rocks')}<span class="sec-note">${t('จากชั้นบนลงชั้นล่าง · แตะเพื่อเปลี่ยนสี', 'top to bottom · tap to change the colour')}</span></h2>
+      <h2 class="sec-h">${t('หิน', 'Rocks')}<span class="sec-note">${t('จากชั้นบนลงชั้นล่าง · แตะเพื่อเปลี่ยนชนิดหรือสี', 'top to bottom · tap to change its part or colour')}</span></h2>
       <ul class="xs-rocks" id="xsRocks"></ul>
     </section>
     <section class="xs-sec">
@@ -225,6 +228,9 @@ export async function render(root, ctx) {
     }
     if (shown?.clipped) notes.push(t('ภาพสูงเกินไป จึงลดความลึกหรืออัตราส่วนแกนตั้งลงให้', 'The picture was too tall, so the depth or vertical scale was reduced'));
     if (model.bends.length) notes.push(t(`แนวเดินหักมุมที่ ${model.bends.map((b) => `${b.code} (${Math.round(b.angle)}°)`).join(', ')} ภาพช่วงนั้นบิด (เส้นจุดแนวตั้ง) ถ้าจุดไหนออกนอกแนวมาก ปิด "ให้แนวตัดผ่านจุดนี้"`, `The path turns at ${model.bends.map((b) => `${b.code} (${Math.round(b.angle)}°)`).join(', ')}; the picture bends there (dotted lines). If a station is far off the line, switch off "Section runs through here".`));
+    const guessed = model.rocks.filter((r) => r.autoRole && r.role !== 'layer');
+    if (guessed.length) notes.push(t(`แอปตั้งให้อัตโนมัติจากชื่อหิน: ${guessed.map((r) => `${esc(r.name)} เป็น${xs.roleName(r.role)}`).join(', ')} · แตะชื่อหินในรายการด้านล่างเพื่อเปลี่ยน`, `Set from the rock names: ${guessed.map((r) => `${esc(r.name)} is ${xs.roleName(r.role)}`).join(', ')} · tap the rock in the list below to change it`));
+    if (model.rocks.some((r) => r.coverAsBeds)) notes.push(t('ทุกจุดในแนวนี้เป็นชั้นปิดทับ ไม่มีหินที่แก่กว่าให้ปิดทับ จึงวาดเป็นชั้นหินปกติ', 'Every station on this line is cover, with no older rock under it to show, so it is drawn as ordinary beds'));
     if (!model.hasDips) notes.push(t('ยังไม่มีมุมเอียง (Bedding) ในแนวนี้ ชั้นหินจึงวาดเป็นแนวราบ', 'No bedding dips on this line yet, so the beds are drawn flat'));
     if (!model.rocks.length) notes.push(t('ยังไม่มีชนิดหินในแนวนี้ ใต้ดินจึงเป็นสีเทา', 'No rock types on this line yet, so the ground is grey'));
     if (path.noCoord) notes.push(t(`${path.noCoord} Station ไม่มีพิกัด จึงไม่อยู่ในแนวตัด`, `${path.noCoord} station(s) have no coordinates and are not on the line`));
@@ -234,7 +240,7 @@ export async function render(root, ctx) {
   function paintLists() {
     const rocksEl = q('#xsRocks');
     rocksEl.innerHTML = model?.order.length
-      ? model.order.map((r) => `<li><button type="button" class="xs-rock" data-rock="${esc(r.key)}"><i class="xs-sw" style="background:${r.color}"></i><span>${rockName(r)}</span><small>${r.n} Station${r.n > 1 ? 's' : ''}</small></button></li>`).join('')
+      ? model.order.map((r) => `<li><button type="button" class="xs-rock" data-rock="${esc(r.key)}"><i class="xs-sw" style="background:${r.color}"></i><span>${rockName(r)}${r.role !== 'layer' ? `<em class="xs-role">${xs.roleShort(r.role)}</em>` : ''}</span><small>${r.n} Station${r.n > 1 ? 's' : ''}</small></button></li>`).join('')
       : `<li class="sec-empty">${t('ยังไม่มีชนิดหินในแนวนี้', 'No rock types on this line yet')}</li>`;
     const byId = new Map((model?.pts || []).map((p) => [p.st.id, p]));
     const ends = walkEnds(stations);
@@ -302,18 +308,63 @@ export async function render(root, ctx) {
     if (def) def.disabled = !cfg.colors[box2.dataset.key];
   };
 
-  function openRockColor(key) {
+  // ---------- one rock: the part it plays in the picture, and its colour ----------
+  const ROLE_WHAT = () => ({
+    layer: t('ชั้นหิน: ส่วนหนึ่งของชั้นที่เอียงหรือคดโค้งตามมุมเอียงที่วัด', 'Bed: part of the tilted or folded beds, following the measured dips'),
+    cover: t('ชั้นปิดทับ: วางบนรอยชั้นไม่ต่อเนื่องทับหินที่แก่กว่า เช่นตะกอน ศิลาแลง ลาวาบะซอลต์ ฐานลากตรงระหว่างจุดที่สัมผัสหินที่แก่กว่า', 'Cover: lies on an unconformity over older rock (sediment, laterite, a lava flow); its base runs straight between where it meets older rock'),
+    intrusion: t('หินอัคนีแทรกซอน: ก้อนที่ผุดตัดผ่านชั้นหิน กว้างเท่าที่โผล่บนผิวดิน ผนังขยายออกเมื่อลึกลง', 'Intrusion: a body cutting up through the beds, as wide as it comes up, its walls widening downward'),
+  });
+  const roleHTML = (key) => {
+    const r = model?.rocks.find((x) => x.key === key);
+    if (!r) return '';
+    const chosen = xs.ROLES.includes(cfg.roles[key]) ? cfg.roles[key] : 'auto';
+    const guess = xs.autoRole(r.key.startsWith('c:') ? r.name : r.key);
+    const what = ROLE_WHAT();
+    const hint = chosen === 'auto'
+      ? `${t(`อัตโนมัติ: แอปเลือก${xs.roleName(guess)} จากชื่อหิน`, `Auto: ${xs.roleName(guess)}, from the rock's name`)} · ${what[guess]}`
+      : what[chosen];
+    return `<div class="field"><span class="lbl">${t('หินนี้ในภาพตัดขวาง', 'This rock in the section')}</span>
+      ${seg('role', chosen, [['auto', t('อัตโนมัติ', 'Auto')], ['layer', t('ชั้นหิน', 'Bed')], ['cover', t('ปิดทับ', 'Cover')], ['intrusion', t('แทรกซอน', 'Intrusion')]])}
+      <p class="hint">${hint}</p></div>
+      ${r.role === 'intrusion' ? `<div class="field"><span class="lbl">${t('ผนังของก้อนหิน (มุมจากแนวราบ)', 'Walls of the body (angle from horizontal)')}</span>
+        ${seg('wall', r.wall, xs.WALLS.map((d) => [d, `${d}°`]))}
+        <p class="hint">${t('90° ผนังตั้งตรง · มุมยิ่งน้อย ก้อนหินยิ่งขยายออกเมื่อลึกลง', '90° goes straight down · the smaller the angle, the more the body widens with depth')}</p></div>` : ''}`;
+  };
+
+  function openRock(key) {
     const r = model?.rocks.find((x) => x.key === key);
     if (!r) return;
-    const ov = openOverlay(`<div class="sheet xs-sheet" role="dialog" aria-label="${t('สีของหิน', 'Rock colour')}">
+    let sheet = null;
+    const repaint = debounce(async () => {
+      await refresh();
+      if (!sheet?.isConnected) return; // the sheet was closed meanwhile
+      sheet.querySelector('#xsRoleBox').innerHTML = roleHTML(key);
+    }, 120);
+    const ov = openOverlay(`<div class="sheet xs-sheet" role="dialog" aria-label="${esc(r.name)}">
       <div class="sheet-grip"></div>
       <h3>${rockName(r)}</h3>
-      <p class="sheet-sub">${t('สีนี้ใช้กับทุกจุดของหินนี้ในภาพตัดขวาง ไม่เปลี่ยนสีหมุดบนแผนที่', 'This colour is used for this rock everywhere in the cross section; map pins keep theirs')}</p>
-      ${colorHTML(key)}
+      <p class="sheet-sub">${t('ใช้กับหินนี้ทุกจุดในภาพตัดขวาง สมุดบันทึกและสีหมุดบนแผนที่ไม่เปลี่ยน', 'Applies to this rock everywhere in the cross section; the notebook and the map pins stay as they are')}</p>
+      <div id="xsRoleBox">${roleHTML(key)}</div>
+      <div class="field"><span class="lbl">${t('สี', 'Colour')}</span>${colorHTML(key)}</div>
       <div class="btn-row one"><button type="button" class="btn-primary" data-close>${t('เสร็จ', 'Done')}</button></div>
-    </div>`, { onClick: (e) => onColorClick(e, key, (c) => syncColor(ov.el, c)) });
+    </div>`, {
+      onClick: (e) => {
+        const b = e.target.closest('.seg button');
+        const k = b?.closest('.seg')?.dataset.k;
+        if (k === 'role' || k === 'wall') {
+          b.closest('.seg').querySelectorAll('button').forEach((x) => { const on = x === b; x.classList.toggle('on', on); x.setAttribute('aria-checked', String(on)); });
+          if (k === 'wall') cfg.walls[key] = Number(b.dataset.v);
+          else if (b.dataset.v === 'auto') delete cfg.roles[key];
+          else cfg.roles[key] = b.dataset.v;
+          save();
+          repaint();
+          return;
+        }
+        onColorClick(e, key, (c) => syncColor(ov.el, c));
+      },
+    });
     // listen on the sheet itself: #overlay is shared by every sheet and outlives this one
-    const sheet = ov.el.querySelector('.xs-sheet');
+    sheet = ov.el.querySelector('.xs-sheet');
     sheet.addEventListener('input', (e) => {
       if (e.target.matches('input[type=color]')) { setColor(key, e.target.value); syncColor(sheet, e.target.value); }
     });
@@ -495,12 +546,12 @@ export async function render(root, ctx) {
     const row = e.target.closest('.xs-row');
     if (row) { openEditor(row.dataset.id); return; }
     const rk = e.target.closest('[data-rock]');
-    if (rk) { openRockColor(rk.dataset.rock); return; }
+    if (rk) { openRock(rk.dataset.rock); return; }
     if (e.target.closest('#xsRetry')) { sig = null; refresh({ forceGround: true }); return; }
     if (e.target.closest('#veAuto')) { cfg.ve = 'auto'; save(); redraw(); return; }
     if (e.target.closest('#xsReset')) {
       if (!confirm(t('ล้างการแก้ไขทั้งหมดในภาพตัดขวางนี้? (สมุดบันทึกไม่เปลี่ยน)', 'Clear every change in this cross section? (The notebook is not affected.)'))) return;
-      cfg.over = {}; cfg.contacts = {}; cfg.colors = {};
+      cfg.over = {}; cfg.contacts = {}; cfg.colors = {}; cfg.roles = {}; cfg.walls = {};
       save();
       refresh();
       return;
